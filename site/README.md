@@ -7,7 +7,8 @@
 
 ホスティングは [AWS Blocks](https://docs.aws.amazon.com/blocks/latest/devguide/what-is-blocks.html) の
 `Hosting` construct を使い、Amazon CloudFront + Amazon S3 に静的サイトとしてデプロイします。バックエンド
-APIは持たない、純粋な静的サイトです。
+APIは持たない、純粋な静的サイトです。`Hosting` は素の CDK スタックに直接乗せているだけで、AWS Blocksの
+バックエンド(API Gateway + Lambda)は一切作りません。
 
 ## トピック側の構成
 
@@ -34,9 +35,9 @@ site/
 ├── generate.mjs        # 各トピックの site/ を dist/ に集約するスクリプト
 ├── homepage.css         # トップページ(トピック一覧)専用のスタイル
 ├── aws-blocks/
-│   ├── index.ts           # バックエンド定義(APIなし。AWS Blocksの構造上ファイルのみ必要)
-│   ├── index.cdk.ts        # CDKレイヤー。Hosting constructでCloudFront+S3を構築
-│   └── scripts/            # デプロイ/削除用スクリプト(AWS Blocksの標準テンプレートのまま)
+│   ├── index.cdk.ts        # CDKレイヤー。素のcdk.Stack + Hosting constructでCloudFront+S3を構築(バックエンドなし)
+│   └── scripts/            # デプロイ/削除用スクリプト。deploy.tsはバックエンドAPIを前提とする
+│                            # AWS Blocks標準の deploy() ではなく `cdk deploy` を直接呼ぶ独自実装
 └── package.json
 ```
 
@@ -75,8 +76,11 @@ npm run destroy
 - `site/aws-blocks/` はこのサイトを配信するためだけのAWS Blocksアプリで、他のトピックの `cdk/`・
   `terraform/` ハンズオンとは独立しています。
 - 各トピックの `site/index.html` の中身・デザインはこのツールでは一切加工しません。
-- `site/.blocks/config.json` の `stackId` は `AWS`/`aws` から始まる名前にしないこと。AWS Blocksは
+- `site/.blocks/config.json` の `stackId` は `AWS`/`aws` から始まる名前にしないこと。この制約は
+  `BlocksStack`(AWS Blocksのバックエンド)を使うアプリ全般に当てはまる: `BlocksStack.create()` は
   スタック名(`<stackId>-prod`)から `AWS::ResourceGroups::Group` を自動生成するが、Resource Groups
   のグループ名は大文字小文字を問わず `AWS` で始まる名前を予約語として拒否するため、`stackId` がそれで
-  始まっているとデプロイが
-  `Group name must not start with 'AWS' (Service: ResourceGroups, Status Code: 400)` で失敗する。
+  始まっていると `Group name must not start with 'AWS' (Service: ResourceGroups, Status Code: 400)` で
+  デプロイが失敗する。このsiteアプリ自体は現在バックエンドなし(`BlocksStack` を使わず素の `cdk.Stack` +
+  `Hosting` のみ)なのでこの自動生成は起きないが、`stackId` は他の用途(スタック名そのものなど)にも
+  使われるので引き続き `aws`/`AWS` 始まりは避けること。
