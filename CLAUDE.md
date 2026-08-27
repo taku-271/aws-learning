@@ -29,12 +29,21 @@ Each study topic gets its own top-level directory, numbered in the order it was 
 - When creating a new topic, follow the structure of existing topic directories rather than
   inventing a new layout.
 
-`<topic>/site/`, when present, is a hand-authored `index.html` (plus whatever CSS/assets it wants)
-that is that topic's public page — a separate, freely-designed artifact, not a rendering of the
-README. It's optional and separate from README.md: write it only when the user wants that topic
-published, and design it however fits the topic (don't reuse a fixed template across topics). Link
-back to the site's top page with `../../index.html` if you want a "back to list" link. It does not
-need to mirror the README's content.
+`<topic>/site/`, when present, is a hand-authored `index.html` plus `style.css` that is that topic's
+public page — a separate artifact, not a rendering of the README. It's optional and separate from
+README.md: write it only when the user wants that topic published. It does not need to mirror the
+README's content.
+
+All topics' `site/` pages share one common design system, so the published site feels consistent
+when browsing between topics. Reuse the same CSS custom properties (`--bg`, `--fg`, `--muted`,
+`--border`, `--link`, `--accent`, `--panel`, `--code-bg`, `--pill-bg`/`--pill-fg`, light/dark via
+`prefers-color-scheme`) and the same structural classes (`.page`, `.back-link`, `header.hero` with
+`.topic-number`/`.pill-row`/`.pill`, `<section>` blocks under `h2`, `.card-grid`, `.flow`, `table`,
+`.refs`, `footer`) established in `02-bedrock-agentcore-gateway/site/`. When writing a new topic's
+`site/`, copy that topic's `style.css` as the starting point rather than inventing a new one, and
+only add topic-specific classes (like `02`'s `.diagram`/`.auth-columns`) for content that doesn't
+fit the shared components. Link back to the site's top page with `../../index.html` if you want a
+"back to list" link.
 
 One exception to the numbered-topic layout: `site/` at the repo root. It is not a study topic — it's
 an AWS Blocks app that collects every topic's `<topic>/site/` directory into a single static HTML
@@ -56,7 +65,8 @@ writing anything. Do this in order:
 3. Only after the summary is written, add hands-on `cdk/` and/or `terraform/` code for the topic if
    requested or appropriate.
 4. If the user wants this topic published to the site, write `<topic>/site/index.html` (see
-   Structure and conventions above) — a freely designed page, not an auto-generated one.
+   Structure and conventions above) using the shared design system — a hand-authored page, not an
+   auto-generated one, but consistent in look with the other topics' `site/` pages.
 5. This isn't limited to the initial study session: whenever later work in the same conversation
    produces a study-relevant result for an existing topic (e.g. answering a follow-up question with
    fresh AWS-doc research, a cost/performance comparison, a deeper dive into one part of the topic),
