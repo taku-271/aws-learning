@@ -57,6 +57,14 @@ writing anything. Do this in order:
    requested or appropriate.
 4. If the user wants this topic published to the site, write `<topic>/site/index.html` (see
    Structure and conventions above) — a freely designed page, not an auto-generated one.
+5. This isn't limited to the initial study session: whenever later work in the same conversation
+   produces a study-relevant result for an existing topic (e.g. answering a follow-up question with
+   fresh AWS-doc research, a cost/performance comparison, a deeper dive into one part of the topic),
+   append it to that topic's `README.md` too — don't leave it only in the chat response. If that
+   topic already has a `<topic>/site/index.html`, add the same content there as well (matching that
+   page's existing style), so the README and the published site stay in sync. If the topic has no
+   `site/` page yet, updating the README alone is enough — don't create a `site/` page just for this
+   (see Study workflow step 4 for when to add one).
 
 If no AWS MCP server is available in the session, tell the user before falling back to general
 knowledge, since the point of this workflow is to ground the notes in current AWS documentation.
