@@ -54,6 +54,29 @@ p {
   color: var(--muted);
 }
 
+.search-box {
+  margin-bottom: 1rem;
+}
+
+.search-box input[type="search"] {
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  font-size: 1rem;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.search-box input[type="search"]:focus {
+  outline: 2px solid var(--link);
+  outline-offset: -1px;
+}
+
+.topic-empty {
+  color: var(--muted);
+}
+
 .topic-list {
   list-style: none;
   padding: 0;
