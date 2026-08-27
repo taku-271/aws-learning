@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amazon Bedrock AgentCore Gateway — AWS Learning Notes</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+  <a class="back-link" href="../../index.html">&larr; 学習トピック一覧へ</a>
+
+  <header class="hero">
+    <div class="topic-number">TOPIC 02</div>
+    <h1>Amazon Bedrock AgentCore Gateway<br>— エージェント専用のセキュアな入口</h1>
+    <p class="lead">
+      AIエージェントがツール・他のエージェント・LLMへアクセスするための、単一のセキュアなエントリポイントを
+      フルマネージドで提供するサービスについて学んだメモ。
+    </p>
+    <div class="pill-row">
+      <span class="pill">MCP互換ツール変換</span>
+      <span class="pill">インバウンド/アウトバウンド認証</span>
+      <span class="pill">サーバーレス</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Gateway は何をしてくれるのか</h2>
+    <p>
+      エージェントに独自ツールを持たせようとすると、社内APIやLambdaをMCPサーバーとして自前でラップする実装、
+      インフラの構築・スケーリング、ツールごとに異なる認証方式の管理、エージェント自身の認証検証など、
+      本質的でない作業が積み上がる。<strong>AgentCore Gateway はこれらを肩代わりし</strong>、開発者がエージェント
+      固有のロジックに集中できるようにする。
+    </p>
+    <p>
+      単なる「MCPツールゲートウェイ」に留まらず、既存のAPI・Lambda・他のエージェント(A2A通信)・複数モデル
+      プロバイダーへのルーティングまでを扱う、<strong>エージェント向けAIゲートウェイ</strong>として位置づけられている。
+      Bedrock AgentCoreは Gateway 以外にも Runtime・Memory・Identity・Observability から構成されるが、
+      本トピックでは Gateway に絞る。
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="エージェントからGatewayを経由してTargetやモデルプロバイダーへ接続する構成図">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--edge)"></path>
+          </marker>
+        </defs>
+
+        <!-- edges -->
+        <line x1="120" y1="150" x2="278" y2="150" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow)"></line>
+        <line x1="482" y1="90"  x2="600" y2="55"  stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow)"></line>
+        <line x1="482" y1="115" x2="600" y2="110" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow)"></line>
+        <line x1="482" y1="150" x2="600" y2="150" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow)"></line>
+        <line x1="482" y1="185" x2="600" y2="190" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow)"></line>
+        <line x1="482" y1="210" x2="600" y2="245" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow)"></line>
+
+        <!-- agent node -->
+        <rect x="20" y="120" width="100" height="60" rx="10" fill="var(--node-bg)" stroke="var(--node-border)" stroke-width="1.5"></rect>
+        <text x="70" y="145" text-anchor="middle" font-size="13" font-weight="600" fill="var(--fg)">エージェント</text>
+        <text x="70" y="163" text-anchor="middle" font-size="10" fill="var(--muted)">CrewAI / Strands 等</text>
+
+        <!-- gateway node -->
+        <rect x="280" y="90" width="200" height="120" rx="12" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"></rect>
+        <text x="380" y="118" text-anchor="middle" font-size="14" font-weight="700" fill="var(--accent)">AgentCore Gateway</text>
+        <text x="380" y="140" text-anchor="middle" font-size="10.5" fill="var(--muted)">単一のMCPエンドポイント</text>
+        <line x1="300" y1="152" x2="460" y2="152" stroke="var(--border)"></line>
+        <text x="380" y="170" text-anchor="middle" font-size="10.5" fill="var(--fg)">ingress認証(JWT)</text>
+        <text x="380" y="188" text-anchor="middle" font-size="10.5" fill="var(--fg)">egress認証・変換・集約</text>
+
+        <!-- target nodes -->
+        <rect x="600" y="30" width="140" height="42" rx="8" fill="var(--node-bg)" stroke="var(--node-border)"></rect>
+        <text x="670" y="55" text-anchor="middle" font-size="11.5" fill="var(--fg)">Lambda targets</text>
+
+        <rect x="600" y="87" width="140" height="42" rx="8" fill="var(--node-bg)" stroke="var(--node-border)"></rect>
+        <text x="670" y="112" text-anchor="middle" font-size="11.5" fill="var(--fg)">OpenAPI / Smithy</text>
+
+        <rect x="600" y="127" width="140" height="42" rx="8" fill="var(--node-bg)" stroke="var(--node-border)"></rect>
+        <text x="670" y="152" text-anchor="middle" font-size="11.5" fill="var(--fg)">MCP server / API GW</text>
+
+        <rect x="600" y="167" width="140" height="42" rx="8" fill="var(--node-bg)" stroke="var(--node-border)"></rect>
+        <text x="670" y="192" text-anchor="middle" font-size="11.5" fill="var(--fg)">HTTP runtime</text>
+
+        <rect x="600" y="224" width="140" height="42" rx="8" fill="var(--node-bg)" stroke="var(--node-border)"></rect>
+        <text x="670" y="243" text-anchor="middle" font-size="11.5" fill="var(--fg)">他のエージェント</text>
+        <text x="670" y="257" text-anchor="middle" font-size="9.5" fill="var(--muted)">(passthrough / A2A)</text>
+      </svg>
+      <p class="diagram-caption">
+        Gateway が単一の入口となり、Targetを介して既存API・Lambda・他エージェント・モデルプロバイダーを
+        MCPツールとして束ねる。
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>主なメリット</h2>
+    <ul class="card-grid">
+      <li><strong>ツール開発の簡素化</strong>既存のAPI/Lambdaを数行でエージェント対応ツールに変換できる。</li>
+      <li><strong>統一アクセス</strong>API・Lambda・他エージェント・モデルプロバイダーを1つのセキュアなエンドポイントに集約。</li>
+      <li><strong>セマンティック検索でスケール</strong>ツール数が増えても<code>x_amz_bedrock_agentcore_search</code>で自然言語から適切なツールを発見。</li>
+      <li><strong>包括的な認証</strong>インバウンド(エージェントの身元確認)とアウトバウンド(ツール接続)を1サービスで管理。OAuthフロー・トークンリフレッシュにも対応。</li>
+      <li><strong>フレームワーク互換</strong>CrewAI、LangGraph、LlamaIndex、Strands Agentsなど主要OSSに対応。</li>
+      <li><strong>サーバーレス</strong>インフラ管理不要、需要に応じ自動スケール、監査機能を内蔵。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>内部の主な機能</h2>
+    <table>
+      <thead><tr><th>機能</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td>Security Guard</td><td>OAuth認可を管理し、正当なユーザー/エージェントのみがツール・リソースにアクセスできるようにする</td></tr>
+        <tr><td>Translation</td><td>MCPなどのエージェントリクエストをAPIリクエストやLambda呼び出しに変換する</td></tr>
+        <tr><td>Composition</td><td>複数のAPI・関数・ツール・エージェント・モデルプロバイダーを単一エンドポイントの背後に集約する</td></tr>
+        <tr><td>Secure Credential Exchange</td><td>ツールごとに異なる認証情報の注入を処理する</td></tr>
+        <tr><td>Semantic Tool Selection</td><td>自然言語検索で最適なツールを見つけ、プロンプトサイズとレイテンシを削減する</td></tr>
+        <tr><td>Infrastructure Manager</td><td>サーバーレスでオブザーバビリティ/監査機能を内蔵、インフラ管理が不要</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>コアコンセプト：Gateway と Target</h2>
+    <p>
+      <strong>Gateway</strong> はエージェントがアクセスする単一のMCPエンドポイント(URL)。ここに複数の
+      <strong>Target</strong> を登録し、Targetを追加するとその裏側のAPI/Lambda/サービスがMCPツールとして
+      Gateway経由で公開される。
+    </p>
+    <table>
+      <thead><tr><th>Target種別</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td>Lambda targets</td><td>AWS Lambda関数をMCPツールに変換する</td></tr>
+        <tr><td>OpenAPI targets</td><td>OpenAPI仕様(REST API)をMCPツールとして公開する</td></tr>
+        <tr><td>Smithy targets</td><td>Smithyモデル定義から型安全なMCPツールを構築する</td></tr>
+        <tr><td>MCP server targets</td><td>既存の外部MCPサーバー(URLエンドポイント)にそのまま接続する</td></tr>
+        <tr><td>API Gateway stage targets</td><td>Amazon API Gatewayのステージをターゲットにする</td></tr>
+        <tr><td>HTTP runtime targets</td><td>任意のHTTPランタイムをターゲットにする</td></tr>
+        <tr><td>Connector targets</td><td>Bedrock Managed Knowledge Bases、Web Search Toolなどの組み込みコネクタ</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>インバウンド認証とアウトバウンド認証</h2>
+    <div class="auth-columns">
+      <div>
+        <span class="direction">Ingress ← エージェントを検証</span>
+        <h3>インバウンド認証</h3>
+        <p>
+          Gatewayを呼び出すエージェント/クライアントを検証する仕組み。JWTベースの認証
+          (<code>CUSTOM_JWT</code>)が中心で、OIDCのDiscovery URL・許可するAudience/Client ID/Scope・
+          カスタムクレームの一致条件などを設定する。Amazon Cognitoをアイデンティティプロバイダーとして
+          使う構成がクイックスタートとして用意されており、<code>agentcore create</code>コマンドで
+          自動セットアップできる。
+        </p>
+      </div>
+      <div>
+        <span class="direction">Egress → Targetへ接続</span>
+        <h3>アウトバウンド認証</h3>
+        <p>
+          Gatewayが各Targetの裏側(Lambda実行ロール、外部APIのAPIキー、OAuthなど)へアクセスする際の
+          認証情報。Targetごとに異なる認証方式(IAMロール、APIキー、OAuth)を設定でき、Gatewayが
+          認証情報の交換・注入を代行する。
+        </p>
+      </div>
+    </div>
+    <p>
+      Runtime/Gateway双方で共通の仕組みとして、エージェントごとに<strong>ワークロードアイデンティティ</strong>
+      (AgentCore Identity)が割り当てられる。IAMロール、OAuth 2.0トークン、APIキーなど複数の認証手段を
+      横断して、エージェントの一貫した身元を保つ。
+    </p>
+  </section>
+
+  <section>
+    <h2>オプション機能</h2>
+    <table>
+      <thead><tr><th>機能</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td>Debugging messages</td><td>Gateway呼び出し時に詳細なデバッグメッセージを返す(本番投入前に無効化推奨)</td></tr>
+        <tr><td>Custom encryption</td><td>AWS管理キーの代わりに自分で管理するKMSキーで暗号化する</td></tr>
+        <tr><td>Semantic search of tools</td><td>自然言語クエリでツールを検索する(<code>x_amz_bedrock_agentcore_search</code>)</td></tr>
+        <tr><td>Tagging</td><td>リソースへのタグ付け</td></tr>
+        <tr><td>MCP sessions</td><td>クライアント-Gateway間のステートフルなやり取り(session ID保持)</td></tr>
+        <tr><td>Response streaming</td><td>ツール実行中の進捗をServer-Sent Events(SSE)でリアルタイム受信</td></tr>
+        <tr><td>Elicitation</td><td>MCP server targetがツール呼び出し中にクライアントへ追加情報(ユーザー確認や認証)を要求する</td></tr>
+        <tr><td>Sampling</td><td>MCP server targetがツール呼び出し中にクライアントへLLM補完を要求する</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>セットアップの基本フロー</h2>
+    <ol class="flow">
+      <li>
+        <strong>Gatewayを作成する</strong><br>
+        インバウンド認証としてJWTオーソライザーを設定する。CognitoユーザープールをCLIで自動作成することも可能。
+      </li>
+      <li>
+        <strong>1つ以上のTargetを追加する</strong><br>
+        Lambda、OpenAPI、MCPサーバーなど。Targetごとにツールスキーマとアウトバウンド認証情報を定義する。
+      </li>
+      <li>
+        <strong>エージェントから接続する</strong><br>
+        Strands Agentsなどのフレームワークからアクセストークンを取得してGatewayのMCPエンドポイントに接続し、
+        ツールを一覧・呼び出しする。
+      </li>
+    </ol>
+
+    <h3>CLIでの例(Lambda Target)</h3>
+    <pre><code># Gateway作成(対話式でCognito等をセットアップ)
+agentcore create
+
+# Lambda関数をTargetとして追加
+agentcore add gateway-target \
+  --name MyLambdaTarget \
+  --type lambda-function-arn \
+  --lambda-arn arn:aws:lambda:us-east-1:123456789012:function:MyFunction \
+  --tool-schema-file tools.json \
+  --gateway MyGateway
+
+agentcore deploy</code></pre>
+    <p>
+      <code>tools.json</code> には、MCPツールとして公開する関数のスキーマ(name/description/inputSchema)を
+      JSON Schemaで記述する。
+    </p>
+
+    <h3>Python SDK(GatewayClient)での例</h3>
+    <pre><code>from bedrock_agentcore_starter_toolkit.operations.gateway.client import GatewayClient
+
+client = GatewayClient(region_name="us-east-1")
+
+lambda_target = client.create_mcp_gateway_target(
+    gateway=gateway,
+    name=None,          # 省略すると自動生成
+    target_type="lambda",
+    target_payload=None, # 省略すると新規Lambdaが自動作成される
+    credentials=None,    # 省略すると認証情報も自動作成される
+)</code></pre>
+  </section>
+
+  <section>
+    <h2>料金</h2>
+    <p>消費ベース(コンサンプションベース)の課金モデル。前払い不要・最低利用料金なし。</p>
+    <ul>
+      <li><code>ListTools</code> / <code>InvokeTool</code> / Search API などのAPI呼び出し回数に対して課金</li>
+      <li>セマンティック検索用にインデックスされたTarget数に対して課金</li>
+      <li>ネットワークデータ転送は標準のEC2料金が適用される</li>
+      <li>顧客のVPCへのデータegressには$0.006/GBのデータ処理料金がかかる(商用リージョン)</li>
+      <li>Web SearchやBedrock Managed Knowledge Baseの利用は別途課金</li>
+      <li>カスタムのレート制限自体には追加料金はかからない</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>今後試したいハンズオン</h2>
+    <div class="note">
+      <ul style="margin:0;">
+        <li>Lambda TargetをGatewayに登録し、Strands Agentsなどのフレームワークから呼び出す</li>
+        <li>Cognitoによるインバウンド認証(JWT)を設定し、アクセストークン取得〜Gateway呼び出しまでの一連の流れを試す</li>
+        <li>セマンティックツール検索を有効化し、複数ツール登録時の挙動を確認する</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>参考リンク</h2>
+    <ul class="refs">
+      <li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway.html">Amazon Bedrock AgentCore Gateway: A secure AI gateway for agents, tools, and models(Developer Guide)</a></li>
+      <li><a href="https://aws.amazon.com/blogs/machine-learning/introducing-amazon-bedrock-agentcore-gateway-transforming-enterprise-ai-agent-tool-development/">Introducing Amazon Bedrock AgentCore Gateway(AWS ML Blog)</a></li>
+      <li><a href="https://aws.amazon.com/bedrock/agentcore/faqs/">Amazon Bedrock AgentCore FAQs</a></li>
+      <li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-features.html">Amazon Bedrock AgentCore Gateway features</a></li>
+      <li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-add-target-api-target-config.html">Define the gateway target configuration</a></li>
+      <li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-inbound-auth.html">Set up inbound authorization for your gateway</a></li>
+      <li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/inbound-jwt-authorizer.html">Configure inbound JWT authorizer</a></li>
+      <li><a href="https://aws.amazon.com/bedrock/agentcore/pricing/">Amazon Bedrock AgentCore Pricing</a></li>
+      <li><a href="https://aws.amazon.com/blogs/security/propagate-user-authorization-context-in-ai-agents-with-amazon-bedrock-agentcore/">Propagate user authorization context in AI agents with Amazon Bedrock AgentCore(AWS Security Blog)</a></li>
+    </ul>
+  </section>
+
+  <footer>
+    リポジトリの学習メモ全文は
+    <a href="https://github.com/taku-271/aws-learning/tree/main/02-bedrock-agentcore-gateway">02-bedrock-agentcore-gateway/README.md</a>
+    を参照。
+  </footer>
+</div>
+</body>
+</html>
