@@ -75,3 +75,8 @@ npm run destroy
 - `site/aws-blocks/` はこのサイトを配信するためだけのAWS Blocksアプリで、他のトピックの `cdk/`・
   `terraform/` ハンズオンとは独立しています。
 - 各トピックの `site/index.html` の中身・デザインはこのツールでは一切加工しません。
+- `site/.blocks/config.json` の `stackId` は `AWS`/`aws` から始まる名前にしないこと。AWS Blocksは
+  スタック名(`<stackId>-prod`)から `AWS::ResourceGroups::Group` を自動生成するが、Resource Groups
+  のグループ名は大文字小文字を問わず `AWS` で始まる名前を予約語として拒否するため、`stackId` がそれで
+  始まっているとデプロイが
+  `Group name must not start with 'AWS' (Service: ResourceGroups, Status Code: 400)` で失敗する。
