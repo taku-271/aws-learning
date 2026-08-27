@@ -75,6 +75,63 @@ CloudFormation/CDK では `AWS::Bedrock::KnowledgeBase` リソースの
 `KnowledgeBaseConfiguration` に `ManagedKnowledgeBaseConfiguration`(Managed 型)か
 `VectorKnowledgeBaseConfiguration`(vector store 型)のどちらかを指定する形になっている。
 
+## コスト比較(S3 Vectors / OpenSearch Serverless / Aurora Serverless との比較)
+
+vector store 型 Knowledge Base で使える代表的なベクトルストアと、Managed Knowledge Base の
+料金体系を比べてみた。
+
+### Managed Knowledge Base の料金体系
+
+ストレージ課金 + API呼び出し課金のシンプルなモデル。マルチモーダルパース・埋め込み・
+再ランキングはすべて込み(カスタムモデルに差し替えた場合のみ通常のBedrockモデル料金が
+別途発生)。
+
+| 項目 | 単価 |
+|---|---|
+| インデックスストレージ | $5.00 / GB / 月 |
+| 標準 Retrieve | $1.00 / 1,000件 |
+| Agentic Retrieve | $4.00 / 1,000件(+ 内部で発生する Retrieve 呼び出し分も別途 $1.00/1,000件で加算) |
+| マルチモーダルパース・埋め込み・リランカー | 無料込み |
+
+AWS公式の試算例(SharePointから50GBを取り込み、月10万クエリのケース):
+
+- 標準Retrieveのみ: ストレージ$250 + Retrieve$100 = **月$350**
+- Agentic Retrieve(平均2回の内部呼び出し): ストレージ$250 + Agentic$400 + 内部Retrieve$200 = **月$850**
+
+### 自前のベクトルストアを使う場合(vector store 型 Knowledge Base)
+
+こちらは「埋め込みモデルのトークン課金」+「ベクトルストア自体の課金」の二重構造になる。
+
+| ベクトルストア | 料金モデル | 特徴的なコスト構造 |
+|---|---|---|
+| **OpenSearch Serverless** | OCU(OpenSearch Compute Unit)時間課金、$0.24/OCU時間 | 最初のコレクションは indexing/search 合わせて最低4 OCUが常時課金される仕様。AWSの試算例では 4 OCU × 24h × 30日 = **月$691.20 が「待機しているだけ」でかかる最低ライン**。ストレージは別途GB月課金。 |
+| **Aurora Serverless(pgvector)** | ACU時間課金(目安 $0.12/ACU時間) | 最小0 ACUまでオートポーズ可能 → アイドル時はコンピュート課金ゼロにできる。ストレージは概ね$0.10/GB程度。 |
+| **S3 Vectors** | ストレージ $0.06/GB + PUT/QUERYのリクエスト課金 | プロビジョニング不要のサーバーレス。特化型ベクトルDB比で最大90%のコスト削減を謳う。低頻度アクセス・アーカイブ向け。 |
+
+**ポイント**: OpenSearch Serverlessは「動いていなくても」月$700弱かかる最低ラインがあるため、
+小規模な学習用途やトラフィックが少ないアプリでは Managed KB の方が安くなるケースが多い。
+一方、Aurora ServerlessやS3 VectorsはアイドルコストがOpenSearchより低く抑えられる。
+
+## パフォーマンス比較
+
+| ベクトルストア | レイテンシ目安 | 得意な領域 |
+|---|---|---|
+| **OpenSearch Serverless** | sub-10ms(高スループット・低レイテンシ) | 高頻度クエリ、リアルタイム性が必要なアプリ、全文検索+ベクトル検索の併用 |
+| **Aurora(pgvector)** | 数ミリ秒〜1桁ms(直接クエリ) | リレーショナルDBとベクトル検索を同居させたい場合 |
+| **S3 Vectors** | コールドで1秒未満、ウォームで約100ms | 数十億ベクトル規模の低頻度アクセス・長期保存(RAGでも「たまにしか検索されない」用途向き) |
+| **Managed Knowledge Base** | 非公開(内部ストレージ層はAWSが最適化・非開示) | ハイブリッド検索・ドキュメントランキング・agentic retrieval(マルチホップの自動クエリプランニング/再ランキング)が標準搭載。同等機能を自前構築するとかなりの追加実装が必要になる |
+
+### 使い分けの指針
+
+- **とにかく早く・安く始めたい / 小〜中規模データ / 運用コストをかけたくない** →
+  Managed KB($5/GB + 従量課金、待機コストなし)
+- **超高スループット・sub-10msのレイテンシが必須** →
+  OpenSearch Serverless(ただし待機コスト月$700弱は覚悟)
+- **リレーショナルクエリとベクトル検索を同じDBでやりたい、トラフィックが波がある** →
+  Aurora Serverless + pgvector(オートポーズでコスト圧縮可)
+- **数十億ベクトル規模を激安で長期保存、検索頻度は低くてよい** →
+  S3 Vectors(ストレージ最安、レイテンシは妥協)
+
 ## 学んだこと・メモ
 
 - 「Managed Knowledge Base」という名前は、Bedrock Knowledge Bases 全体の別名ではなく、
@@ -93,6 +150,10 @@ CloudFormation/CDK では `AWS::Bedrock::KnowledgeBase` リソースの
 - [Knowledge bases for Amazon Bedrock (Prescriptive Guidance)](https://docs.aws.amazon.com/prescriptive-guidance/latest/retrieval-augmented-generation-options/rag-fully-managed-bedrock.html)
 - [Build a knowledge base with vector stores (User Guide)](https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base-build.html)
 - [Knowledge Bases now delivers fully managed RAG experience in Amazon Bedrock (AWS Blog)](https://aws.amazon.com/blogs/aws/knowledge-bases-now-delivers-fully-managed-rag-experience-in-amazon-bedrock/)
+- [Amazon Bedrock Pricing(Knowledge Bases セクション)](https://aws.amazon.com/bedrock/pricing/)
+- [Build enterprise search for agents with Amazon Bedrock Managed Knowledge Base (AWS Blog)](https://aws.amazon.com/blogs/machine-learning/build-enterprise-search-for-agents-with-amazon-bedrock-managed-knowledge-base/)
+- [Vector database options / Cost comparisons (Prescriptive Guidance)](https://docs.aws.amazon.com/prescriptive-guidance/latest/choosing-an-aws-vector-database-for-rag-use-cases/vector-db-options.html)
+- [Amazon OpenSearch Service Pricing](https://aws.amazon.com/opensearch-service/pricing/)
 
 ## 次にやりたいこと(ハンズオン候補)
 
