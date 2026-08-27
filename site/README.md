@@ -71,6 +71,56 @@ npm run deploy    # CloudFront + S3 を含むスタックをデプロイ(AWS CLI
 npm run destroy
 ```
 
+## GitHub Actionsでの自動デプロイ
+
+`main` に `site/**` または `<番号>-*/site/**` の変更がpushされると、
+`.github/workflows/deploy-site.yml` が自動で `npm run deploy` を実行します。手動で
+`npm run deploy` を叩く必要はありません(ローカルからの手動デプロイも引き続き可能です)。
+
+認証はOIDC(GitHub Actions ↔ AWS IAM Role)を使い、長期のアクセスキーはリポジトリに置きません。
+初回のみ、AWSアカウント側で以下を手動セットアップしてください(このリポジトリのコードだけでは完結しません)。
+
+1. GitHubをIDプロバイダとして登録(既に他のワークフローで登録済みなら不要):
+   ```bash
+   aws iam create-open-id-connect-provider \
+     --url https://token.actions.githubusercontent.com \
+     --client-id-list sts.amazonaws.com \
+     --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+   ```
+2. GitHub Actionsからのみ引き受けられるIAM Roleを作成し、信頼ポリシーを以下のようにする
+   (`<ACCOUNT_ID>` は自分のAWSアカウントIDに置き換え。`sub`をmainブランチに限定しているので、
+   フォークや他ブランチからは引き受けられません):
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Principal": {
+           "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
+         },
+         "Action": "sts:AssumeRoleWithWebIdentity",
+         "Condition": {
+           "StringEquals": {
+             "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+           },
+           "StringLike": {
+             "token.actions.githubusercontent.com:sub": "repo:taku-271/aws-learning:ref:refs/heads/main"
+           }
+         }
+       }
+     ]
+   }
+   ```
+   権限ポリシーは `cdk deploy`(S3・CloudFront・CloudFormation・IAMなど)が必要とする分を割り当てます。
+   個人の学習用アカウントで対象を絞り込むのが手間な場合は `AdministratorAccess` でも構いませんが、
+   最小権限にしたい場合はCDKが実際に呼ぶAPI(`cloudformation:*`, `s3:*`, `cloudfront:*`,
+   `iam:*Role*` など、CDKスタックのデプロイに必要な範囲)に絞ったカスタムポリシーを用意してください。
+3. 作成したRoleのARNをリポジトリの Settings → Secrets and variables → Actions に
+   `AWS_DEPLOY_ROLE_ARN`(Secret)として、デプロイ先リージョンを `AWS_REGION`(Variable)として登録します。
+
+セットアップ後は、`main` にマージされるたびに自動でサイトが更新されます。
+
 ## 注意
 
 - `site/aws-blocks/` はこのサイトを配信するためだけのAWS Blocksアプリで、他のトピックの `cdk/`・
