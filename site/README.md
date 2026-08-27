@@ -112,10 +112,31 @@ npm run destroy
      ]
    }
    ```
-   権限ポリシーは `cdk deploy`(S3・CloudFront・CloudFormation・IAMなど)が必要とする分を割り当てます。
-   個人の学習用アカウントで対象を絞り込むのが手間な場合は `AdministratorAccess` でも構いませんが、
-   最小権限にしたい場合はCDKが実際に呼ぶAPI(`cloudformation:*`, `s3:*`, `cloudfront:*`,
-   `iam:*Role*` など、CDKスタックのデプロイに必要な範囲)に絞ったカスタムポリシーを用意してください。
+   権限ポリシーは、ローカルで `cdk bootstrap` 済みであれば以下の最小権限で足ります。CDKは
+   `cdk bootstrap` が作成したRole(`cdk-hnb659fds-*`)側に実際にS3・CloudFront・CloudFormationを
+   操作する権限を持たせる設計になっているため、GitHub Actions用Roleにはそれらをassumeする権限
+   だけを与えれば十分です(`<ACCOUNT_ID>`・`<REGION>` は実際の値に置き換え。正確なRole名は
+   `aws iam list-roles --query "Roles[?starts_with(RoleName, 'cdk-hnb659fds')].{Name:RoleName,Arn:Arn}"`
+   で確認できます):
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Sid": "AssumeCdkBootstrapRoles",
+         "Effect": "Allow",
+         "Action": "sts:AssumeRole",
+         "Resource": [
+           "arn:aws:iam::<ACCOUNT_ID>:role/cdk-hnb659fds-deploy-role-<ACCOUNT_ID>-<REGION>",
+           "arn:aws:iam::<ACCOUNT_ID>:role/cdk-hnb659fds-file-publishing-role-<ACCOUNT_ID>-<REGION>",
+           "arn:aws:iam::<ACCOUNT_ID>:role/cdk-hnb659fds-lookup-role-<ACCOUNT_ID>-<REGION>"
+         ]
+       }
+     ]
+   }
+   ```
+   `hnb659fds` はCDKのデフォルトqualifier(`cdk.json` でカスタマイズしていなければそのまま)。
+   Dockerイメージアセットは使わないため `image-publishing-role` は含めていません。
 3. 作成したRoleのARNをリポジトリの Settings → Secrets and variables → Actions に
    `AWS_DEPLOY_ROLE_ARN`(Secret)として、デプロイ先リージョンを `AWS_REGION`(Variable)として登録します。
 
