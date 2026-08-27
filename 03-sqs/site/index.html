@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amazon SQS — AWS Learning Notes</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+  <a class="back-link" href="../../index.html">&larr; 学習トピック一覧へ</a>
+
+  <header class="hero">
+    <div class="topic-number">TOPIC 03</div>
+    <h1>Amazon SQS<br>— コンポーネントを疎結合にするメッセージキュー</h1>
+    <p class="lead">
+      マイクロサービス・分散システム・サーバーレスアプリケーションを疎結合化してスケールさせる、
+      フルマネージドなメッセージキューイングサービスについて学んだメモ。
+    </p>
+    <div class="pill-row">
+      <span class="pill">Standard / FIFO キュー</span>
+      <span class="pill">可視性タイムアウト</span>
+      <span class="pill">デッドレターキュー</span>
+      <span class="pill">Lambda連携</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>SQS は何をしてくれるのか</h2>
+    <p>
+      システム間を直接の同期呼び出しで繋ぐと、受信側がダウンしていると送信側も止まってしまう、受信側の処理速度が
+      生成速度に追いつかないとリクエストが失われる、受信側のスケール機構を自前で作り込む必要がある、といった
+      問題が起きやすい。<strong>SQS をコンポーネント間に挟むことで、送信側(プロデューサー)と受信側
+      (コンシューマー)を疎結合にし</strong>、それぞれを独立してスケール・デプロイできるようにする。
+    </p>
+    <p>
+      メッセージの消失や他サービスの可用性を気にすることなく、任意のボリュームでメッセージを送信・保存・受信でき、
+      メッセージ指向ミドルウェアの運用にまつわる複雑さをAWSが肩代わりしてくれる。
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="プロデューサーからSQSキューを経由してコンシューマーやLambdaが受信し、失敗したメッセージはデッドレターキューへ移動する構成図">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--edge)"></path>
+          </marker>
+        </defs>
+
+        <!-- edges -->
+        <line x1="130" y1="170" x2="278" y2="150" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow)"></line>
+        <line x1="480" y1="105" x2="600" y2="75"  stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow)"></line>
+        <line x1="480" y1="145" x2="600" y2="145" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow)"></line>
+        <line x1="380" y1="220" x2="380" y2="258" stroke="var(--edge)" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#arrow)"></line>
+
+        <!-- producer node -->
+        <rect x="20" y="140" width="110" height="60" rx="10" fill="var(--node-bg)" stroke="var(--node-border)" stroke-width="1.5"></rect>
+        <text x="75" y="166" text-anchor="middle" font-size="13" font-weight="600" fill="var(--fg)">プロデューサー</text>
+        <text x="75" y="184" text-anchor="middle" font-size="10" fill="var(--muted)">SendMessage</text>
+
+        <!-- queue node -->
+        <rect x="280" y="80" width="200" height="140" rx="12" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"></rect>
+        <text x="380" y="108" text-anchor="middle" font-size="14" font-weight="700" fill="var(--accent)">SQS Queue</text>
+        <text x="380" y="130" text-anchor="middle" font-size="10.5" fill="var(--muted)">Standard / FIFO</text>
+        <line x1="300" y1="142" x2="460" y2="142" stroke="var(--border)"></line>
+        <text x="380" y="162" text-anchor="middle" font-size="10.5" fill="var(--fg)">受信中は可視性タイムアウトで</text>
+        <text x="380" y="178" text-anchor="middle" font-size="10.5" fill="var(--fg)">他のコンシューマーから非表示</text>
+        <text x="380" y="200" text-anchor="middle" font-size="10.5" fill="var(--fg)">DelaySeconds / SSE暗号化</text>
+
+        <!-- consumer node -->
+        <rect x="600" y="45" width="140" height="50" rx="8" fill="var(--node-bg)" stroke="var(--node-border)"></rect>
+        <text x="670" y="66" text-anchor="middle" font-size="11.5" fill="var(--fg)">コンシューマー</text>
+        <text x="670" y="82" text-anchor="middle" font-size="9.5" fill="var(--muted)">ReceiveMessage(ロングポーリング)</text>
+
+        <!-- lambda node -->
+        <rect x="600" y="120" width="140" height="50" rx="8" fill="var(--node-bg)" stroke="var(--node-border)"></rect>
+        <text x="670" y="141" text-anchor="middle" font-size="11.5" fill="var(--fg)">AWS Lambda</text>
+        <text x="670" y="157" text-anchor="middle" font-size="9.5" fill="var(--muted)">Event Source Mapping</text>
+
+        <!-- dlq node -->
+        <rect x="280" y="260" width="200" height="50" rx="8" fill="var(--node-bg)" stroke="var(--node-border)"></rect>
+        <text x="380" y="281" text-anchor="middle" font-size="11.5" fill="var(--fg)">Dead-Letter Queue</text>
+        <text x="380" y="297" text-anchor="middle" font-size="9.5" fill="var(--muted)">maxReceiveCount 超過分を隔離</text>
+      </svg>
+      <p class="diagram-caption">
+        プロデューサーが送信したメッセージをキューが保持し、コンシューマーやLambdaがポーリング/イベントで
+        受信する。処理に規定回数失敗したメッセージはデッドレターキューへ移動する。
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>キューの種類: Standard と FIFO</h2>
+    <div class="auth-columns">
+      <div>
+        <span class="direction">高スループット優先</span>
+        <h3>Standard キュー</h3>
+        <p>
+          ほぼ無制限のスループットを持ち、メッセージは<strong>少なくとも1回配信</strong>(まれに重複あり)。
+          順序保証はベストエフォート。重複や順序の入れ替わりを許容できる高スループット処理向け
+          — 例: メディアのアップロードとリサイズ処理の分離、クレジットカード検証タスクの複数ワーカーへの割り当て。
+        </p>
+      </div>
+      <div>
+        <span class="direction">順序・重複排除優先</span>
+        <h3>FIFO キュー</h3>
+        <p>
+          デフォルトで最大3,000msg/秒(バッチ利用時、高スループットモードで最大70,000msg/秒まで拡張可)。
+          メッセージは<strong>正確に1回処理</strong>され、送信順=受信順を厳密に保証する。操作順序が重要、
+          または重複が許されない処理向け — 例: ユーザー入力コマンドの順序実行、価格変更の正しい順序での反映。
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>主要な概念</h2>
+    <ul class="card-grid">
+      <li><strong>可視性タイムアウト</strong>受信したメッセージは一定時間(デフォルト30秒、最大12時間)他のコンシューマーから不可視になる。処理完了前に削除しないと再配信される。</li>
+      <li><strong>デッドレターキュー(DLQ)</strong>指定回数(<code>maxReceiveCount</code>)処理に失敗したメッセージを隔離する別キュー。不良メッセージが他メッセージをブロックするのを防ぐ。</li>
+      <li><strong>ロング/ショートポーリング</strong>ショートポーリングは一部サーバーに即座に問い合わせ、ロングポーリングは最大1〜20秒待って空応答を減らす。ほぼ常にロングポーリングが推奨。</li>
+      <li><strong>遅延キュー(Delay Queues)</strong>投入時から最大15分メッセージを不可視にできる。可視性タイムアウトが「受信時」に不可視化するのに対し、こちらは「投入時」。</li>
+      <li><strong>サーバーサイド暗号化(SSE)</strong>メッセージ本文をKMSキーで暗号化して保存する。キュー名やメッセージIDなどのメタデータは対象外。</li>
+      <li><strong>Lambda連携</strong>Event Source MappingでSQSをLambdaのイベントソースとして登録し、バッチ単位で自動的にポーリング・呼び出しできる。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>メッセージのライフサイクル</h2>
+    <ol class="flow">
+      <li>
+        <strong>送信(SendMessage)</strong><br>
+        プロデューサーがメッセージをキューに送信する。遅延キューが設定されていれば、指定秒数は不可視のまま。
+      </li>
+      <li>
+        <strong>受信(ReceiveMessage)</strong><br>
+        コンシューマーが受信すると、可視性タイムアウトの間そのメッセージは他のコンシューマーから見えなくなる。
+      </li>
+      <li>
+        <strong>処理 &amp; 削除(DeleteMessage)</strong><br>
+        タイムアウト内に処理を終えて削除すれば完了。時間が足りない場合は <code>ChangeMessageVisibility</code>
+        で延長できる(最大12時間まで)。
+      </li>
+      <li>
+        <strong>再配信 or デッドレターキューへ</strong><br>
+        削除されないまま可視性タイムアウトが過ぎると再びキューに戻り、別のコンシューマーに配信される。
+        <code>maxReceiveCount</code> を超えて失敗し続けたメッセージは DLQ に移動し、redrive で元のキューへ
+        再投入したり調査したりできる。
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Lambda との統合(Event Source Mapping)</h2>
+    <p>
+      SQSキューをLambdaのイベントソースとして登録すると、Lambdaサービス側が最大1,000並列(リージョンあたり)の
+      ポーリングスレッドを立ち上げてキューを監視し、メッセージのバッチで関数を同期呼び出しする。関数が正常終了
+      するとバッチ内のメッセージが削除され、エラーやタイムアウトの場合は可視性タイムアウト経過後にメッセージが
+      キューへ戻る。
+    </p>
+    <p>
+      実行ロールには <code>AWSLambdaSQSQueueExecutionRole</code> が必要。バッチサイズはStandardキューで
+      最大10,000件、FIFOキューで最大10件。Lambdaの関数タイムアウトは、キューの可視性タイムアウトより
+      <strong>短く</strong>設定する必要がある(目安として可視性タイムアウトを関数タイムアウトの6倍以上にする)。
+    </p>
+    <pre><code># CLIでイベントソースマッピングを作成する例
+aws lambda create-event-source-mapping --function-name ProcessSQSRecord --batch-size 10 \
+  --event-source-arn arn:aws:sqs:us-east-1:111122223333:my-queue</code></pre>
+  </section>
+
+  <section>
+    <h2>料金</h2>
+    <p>従量課金制で、最低利用料金なし。全リクエストが課金対象だが、無料枠がある。</p>
+    <ul>
+      <li>無料枠: すべてのアカウントで<strong>月100万リクエストまで無料</strong></li>
+      <li><code>SendMessage</code> / <code>ReceiveMessage</code> / <code>DeleteMessage</code> などすべてのリクエストが同一料金で課金される</li>
+      <li>ロングポーリングを使わずに高頻度でポーリングし続けると、メッセージが返らない「空の受信」もリクエストとしてカウントされ、想定以上の課金につながりやすい</li>
+      <li>SSEを使う場合はKMSのAPI呼び出し分の料金が別途発生する</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>今後試したいハンズオン</h2>
+    <div class="note">
+      <ul style="margin:0;">
+        <li>Standard キューと FIFO キューを作成し、送信順序・重複配信の挙動の違いを実際に確認する</li>
+        <li>可視性タイムアウトを短めに設定してわざと処理を遅延させ、メッセージが再配信される様子を観察する</li>
+        <li>DLQ を設定し、<code>maxReceiveCount</code> を超えて失敗したメッセージが DLQ に移動する流れと redrive を試す</li>
+        <li>SQS を Lambda のイベントソースとして登録し、バッチサイズや可視性タイムアウトとの関係を確認する</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>参考リンク</h2>
+    <ul class="refs">
+      <li><a href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues.html">Amazon SQS standard queues</a></li>
+      <li><a href="https://aws.amazon.com/sqs/features/">Amazon SQS Features</a></li>
+      <li><a href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html">Amazon SQS visibility timeout</a></li>
+      <li><a href="https://aws.amazon.com/blogs/compute/implementing-aws-well-architected-best-practices-for-amazon-sqs-part-2/">Implementing AWS Well-Architected best practices for Amazon SQS – Part 2(AWS Compute Blog)</a></li>
+      <li><a href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html">Amazon SQS short and long polling</a></li>
+      <li><a href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-delay-queues.html">Amazon SQS delay queues</a></li>
+      <li><a href="https://docs.aws.amazon.com/help-panel/AWSSimpleQueueService/latest/console/hp-createq-encryption.html">Server-side encryption</a></li>
+      <li><a href="https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-configure.html">Creating and configuring an Amazon SQS event source mapping(Lambda Developer Guide)</a></li>
+      <li><a href="https://aws.amazon.com/sqs/pricing/">Amazon SQS Pricing</a></li>
+      <li><a href="https://aws.amazon.com/sqs/faqs/">Amazon SQS FAQs</a></li>
+    </ul>
+  </section>
+
+  <footer>
+    リポジトリの学習メモ全文は
+    <a href="https://github.com/taku-271/aws-learning/tree/main/03-sqs">03-sqs/README.md</a>
+    を参照。
+  </footer>
+</div>
+</body>
+</html>
