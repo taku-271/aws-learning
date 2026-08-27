@@ -46,15 +46,44 @@ async function copyTopicPage(topic) {
 }
 
 async function renderIndexPage(topics) {
+  const search =
+    topics.length === 0
+      ? ''
+      : `<div class="search-box">
+<input type="search" id="topic-search" placeholder="トピック名で検索" aria-label="トピック名で検索" autocomplete="off">
+</div>`;
+
   const list =
     topics.length === 0
       ? '<p>まだ公開されているトピックがありません。</p>'
-      : `<ul class="topic-list">${topics
+      : `<ul class="topic-list" id="topic-list">${topics
           .map((t) => {
             const { number, name } = topicLabel(t.dir);
-            return `<li><a href="topics/${t.dir}/index.html"><span class="topic-number">${number}</span> ${name}</a></li>`;
+            return `<li data-name="${name.toLowerCase()}"><a href="topics/${t.dir}/index.html"><span class="topic-number">${number}</span> ${name}</a></li>`;
           })
-          .join('\n')}</ul>`;
+          .join('\n')}</ul>
+<p id="topic-empty" class="topic-empty" hidden>該当するトピックがありません。</p>`;
+
+  const script =
+    topics.length === 0
+      ? ''
+      : `<script>
+(() => {
+  const input = document.getElementById('topic-search');
+  const items = Array.from(document.querySelectorAll('#topic-list > li'));
+  const empty = document.getElementById('topic-empty');
+  input.addEventListener('input', () => {
+    const query = input.value.trim().toLowerCase();
+    let visibleCount = 0;
+    for (const item of items) {
+      const matches = item.dataset.name.includes(query);
+      item.hidden = !matches;
+      if (matches) visibleCount++;
+    }
+    empty.hidden = visibleCount !== 0;
+  });
+})();
+</script>`;
 
   const page = `<!doctype html>
 <html lang="ja">
@@ -69,8 +98,10 @@ async function renderIndexPage(topics) {
 <h1>${SITE_TITLE}</h1>
 <p>AWSの学習トピックごとのまとめページです。</p>
 <h2>学習トピック</h2>
+${search}
 ${list}
 </div>
+${script}
 </body>
 </html>
 `;
