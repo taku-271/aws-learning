@@ -112,6 +112,13 @@ npm run destroy
      ]
    }
    ```
+   > **注意**: GitHubのOIDCトークンは、リポジトリ名変更・移管によるなりすまし対策として、
+   > `sub`クレームに所有者・リポジトリ名の後ろへ不変ID(owner ID / repo ID)を付与した
+   > `repo:taku-271@<OWNER_ID>/aws-learning@<REPO_ID>:ref:refs/heads/main`という形式を使う場合があります。
+   > 上記の条件でIAM Roleの引き受けが `AccessDenied` になる場合は、CloudTrailで実際に飛んできた
+   > `AssumeRoleWithWebIdentity` イベントの `userIdentity.userName`(または`principalId`)を確認し、
+   > そこに表示されている実際の値に`sub`条件を合わせてください。IDは変わらないので、ワイルドカードより
+   > 固定値で書く方が安全です。
    権限ポリシーは、ローカルで `cdk bootstrap` 済みであれば以下の最小権限で足ります。CDKは
    `cdk bootstrap` が作成したRole(`cdk-hnb659fds-*`)側に実際にS3・CloudFront・CloudFormationを
    操作する権限を持たせる設計になっているため、GitHub Actions用Roleにはそれらをassumeする権限
