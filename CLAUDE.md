@@ -28,6 +28,11 @@ Each study topic gets its own top-level directory, numbered in the order it was 
 - When creating a new topic, follow the structure of existing topic directories rather than
   inventing a new layout.
 
+One exception to the numbered-topic layout: `site/` at the repo root. It is not a study topic — it's
+an AWS Blocks app that renders every topic's `README.md` (plus the root `README.md`) into a static
+HTML site and hosts it on CloudFront + S3. See `site/README.md` for details. Regenerate it whenever
+topic READMEs change if you want the published site to stay current (it is not run automatically).
+
 ## Study workflow
 
 When the user says they want to study a topic (e.g. "〜を勉強したい"), always research it using
