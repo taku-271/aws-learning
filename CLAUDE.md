@@ -28,6 +28,22 @@ Each study topic gets its own top-level directory, numbered in the order it was 
 - When creating a new topic, follow the structure of existing topic directories rather than
   inventing a new layout.
 
+## Study workflow
+
+When the user says they want to study a topic (e.g. "〜を勉強したい"), always research it using
+the AWS MCP server(s) available in the session (e.g. AWS documentation/knowledge MCP tools) before
+writing anything. Do this in order:
+
+1. Use the AWS MCP tools to look up official documentation/best practices for the topic (search
+   docs, read relevant pages) rather than relying on general knowledge alone.
+2. Create the next numbered topic directory (see Structure and conventions above) and write the
+   findings into its `README.md` as the study summary.
+3. Only after the summary is written, add hands-on `cdk/` and/or `terraform/` code for the topic if
+   requested or appropriate.
+
+If no AWS MCP server is available in the session, tell the user before falling back to general
+knowledge, since the point of this workflow is to ground the notes in current AWS documentation.
+
 ## Working with CDK code
 
 CDK apps live per-topic under `<topic>/cdk/`. Each is an independent CDK app (own
