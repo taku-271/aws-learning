@@ -1,4 +1,4 @@
-# 01. Amazon Bedrock AgentCore Gateway
+# 02. Amazon Bedrock AgentCore Gateway
 
 ## 概要
 
