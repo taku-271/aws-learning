@@ -45,6 +45,31 @@ only add topic-specific classes (like `02`'s `.diagram`/`.auth-columns`) for con
 fit the shared components. Link back to the site's top page with `../../index.html` if you want a
 "back to list" link.
 
+A `site/` page should communicate visually, not just in prose — text-and-tables-only pages (like
+`01-bedrock-managed-knowledge-base/site/` before this convention existed) are the pattern to avoid,
+not the model to copy. For every topic `site/` page:
+
+- Include at least one architecture/flow diagram near the top (after the intro, before the detail
+  sections) showing how the service's main pieces connect — the components involved, the direction
+  of calls/data, and where the topic's key concept sits in that picture. Follow the inline-SVG
+  pattern in `02-bedrock-agentcore-gateway/site/index.html`'s `.diagram` block (nodes as
+  `rect`/`text`, edges as `line` + arrow `marker`, colors from the shared CSS variables so it
+  adapts to light/dark) rather than linking to an external image file — it stays self-contained,
+  themeable, and consistent with the existing page.
+- Prefer a second, purpose-built diagram over a wall of prose wherever the content is inherently
+  comparative or sequential: a step-by-step process reads better as a `.flow` list or a simple SVG
+  sequence than a paragraph of steps; a two-option comparison (like `02`'s inbound/outbound auth)
+  reads better as an `.auth-columns`-style side-by-side than as running text.
+  A `table` is fine for dense reference data (pricing line items, feature matrices, region lists)
+  but shouldn't be the page's only visual device — pair it with a diagram or card layout elsewhere
+  on the page.
+  Add new topic-specific visual classes (in the topic's own `style.css`, following the shared
+  design tokens) when the shared `.diagram`/`.card-grid`/`.auth-columns`/`.flow` set doesn't fit the
+  content — don't force unrelated content into an existing diagram just to avoid adding a class.
+- When revisiting an existing topic's `site/` page for unrelated work, take the opportunity to add
+  a missing diagram if the page has none — don't leave older pages as prose-only outliers as the
+  design system matures.
+
 One exception to the numbered-topic layout: `site/` at the repo root. It is not a study topic — it's
 an AWS Blocks app that collects every topic's `<topic>/site/` directory into a single static HTML
 site and hosts it on CloudFront + S3. It does no templating or conversion of its own beyond building
