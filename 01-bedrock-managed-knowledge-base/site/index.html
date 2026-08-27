@@ -35,6 +35,59 @@
       自動選択し、取得情報をプロンプトに追加してくれる。取得結果には出典（citation）が付くため、
       ハルシネーション抑制とファクトチェックのしやすさにつながる。
     </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="データソースからManaged Knowledge Baseを経由してアプリケーション/エージェントが回答と出典を受け取る構成図">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--edge)"></path>
+          </marker>
+        </defs>
+
+        <!-- edges -->
+        <line x1="160" y1="150" x2="198" y2="150" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow)"></line>
+        <line x1="410" y1="110" x2="458" y2="95"  stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow)"></line>
+        <line x1="410" y1="190" x2="458" y2="205" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow)"></line>
+        <line x1="630" y1="95"  x2="668" y2="122" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow)"></line>
+        <line x1="630" y1="205" x2="668" y2="178" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow)"></line>
+
+        <!-- data source node -->
+        <rect x="20" y="110" width="140" height="80" rx="10" fill="var(--node-bg)" stroke="var(--node-border)" stroke-width="1.5"></rect>
+        <text x="90" y="140" text-anchor="middle" font-size="13" font-weight="600" fill="var(--fg)">データソース</text>
+        <text x="90" y="158" text-anchor="middle" font-size="9.5" fill="var(--muted)">S3 / SharePoint /</text>
+        <text x="90" y="172" text-anchor="middle" font-size="9.5" fill="var(--muted)">Confluence / Drive 等</text>
+
+        <!-- managed KB node -->
+        <rect x="200" y="70" width="210" height="160" rx="12" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"></rect>
+        <text x="305" y="100" text-anchor="middle" font-size="14" font-weight="700" fill="var(--accent)">Managed</text>
+        <text x="305" y="118" text-anchor="middle" font-size="14" font-weight="700" fill="var(--accent)">Knowledge Base</text>
+        <line x1="220" y1="132" x2="390" y2="132" stroke="var(--border)"></line>
+        <text x="305" y="152" text-anchor="middle" font-size="10.5" fill="var(--fg)">取り込み・チャンク分割</text>
+        <text x="305" y="170" text-anchor="middle" font-size="10.5" fill="var(--fg)">埋め込み・ベクトルストア</text>
+        <text x="305" y="188" text-anchor="middle" font-size="10.5" fill="var(--fg)">(すべてBedrockが管理)</text>
+        <text x="305" y="210" text-anchor="middle" font-size="9.5" fill="var(--muted)">インフラ構築・運用は不要</text>
+
+        <!-- API nodes -->
+        <rect x="460" y="70" width="170" height="50" rx="8" fill="var(--node-bg)" stroke="var(--node-border)"></rect>
+        <text x="545" y="91" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--fg)">RetrieveAndGenerate</text>
+        <text x="545" y="107" text-anchor="middle" font-size="9.5" fill="var(--muted)">検索 + 回答生成まで</text>
+
+        <rect x="460" y="180" width="170" height="50" rx="8" fill="var(--node-bg)" stroke="var(--node-border)"></rect>
+        <text x="545" y="201" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--fg)">Retrieve</text>
+        <text x="545" y="217" text-anchor="middle" font-size="9.5" fill="var(--muted)">検索結果(チャンク)のみ</text>
+
+        <!-- app / agent node -->
+        <rect x="670" y="100" width="200" height="100" rx="12" fill="var(--node-bg)" stroke="var(--node-border)" stroke-width="1.5"></rect>
+        <text x="770" y="130" text-anchor="middle" font-size="13" font-weight="600" fill="var(--fg)">アプリケーション</text>
+        <text x="770" y="147" text-anchor="middle" font-size="13" font-weight="600" fill="var(--fg)">/ エージェント</text>
+        <text x="770" y="168" text-anchor="middle" font-size="9.5" fill="var(--muted)">回答 + 出典(citation)</text>
+        <text x="770" y="182" text-anchor="middle" font-size="9.5" fill="var(--muted)">を受け取る</text>
+      </svg>
+      <p class="diagram-caption">
+        データの取り込み・チャンク分割・埋め込み・ベクトルストアをBedrockが内部で完結させ、
+        アプリ/エージェントは Retrieve系APIを呼ぶだけで検索結果や出典付きの回答を得られる。
+      </p>
+    </div>
   </section>
 
   <section>
@@ -43,6 +96,26 @@
       現在、性質の異なる2つの作成方法がある。「Managed Knowledge Base」は
       Bedrock Knowledge Bases 全体の別名ではなく、2026年6月にGAした特定の作成モードを指す点に注意。
     </p>
+
+    <div class="auth-columns">
+      <div>
+        <span class="direction">新 &middot; 2026年6月GA</span>
+        <h3>Managed Knowledge Base</h3>
+        <p>
+          ベクトルストアの選定・構築・スケーリングをBedrockが完全に肩代わりする。利用者はデータソースを
+          指定するだけで、チャンク分割からベクトル化・保存までがブラックボックス化される。
+        </p>
+      </div>
+      <div>
+        <span class="direction">従来 &middot; 2023年11月GA</span>
+        <h3>Knowledge base with vector store</h3>
+        <p>
+          OpenSearch Serverless / Aurora / Pinecone などのベクトルストアを自分で用意する(Quick create
+          も可)。チャンク戦略・埋め込みモデル・再ランカーを個別に選んで細かく制御できる。
+        </p>
+      </div>
+    </div>
+
     <table>
       <thead>
         <tr>

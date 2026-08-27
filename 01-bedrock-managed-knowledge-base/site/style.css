@@ -198,6 +198,32 @@ ol li, ul li {
   margin-bottom: 0.4rem;
 }
 
+/* ---- Diagram: data sources -> managed KB -> retrieve APIs -> app ---- */
+.diagram {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  padding: 1.5rem 1rem 1.75rem;
+  margin: 1.5rem 0;
+  overflow-x: auto;
+}
+
+.diagram svg {
+  display: block;
+  margin: 0 auto;
+  min-width: 640px;
+  width: 100%;
+  max-width: 900px;
+  height: auto;
+}
+
+.diagram-caption {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin: 0.75rem 0 0;
+}
+
 /* ---- Card grid for benefits / capabilities ---- */
 .card-grid {
   display: grid;
@@ -220,6 +246,36 @@ ol li, ul li {
   display: block;
   margin-bottom: 0.35rem;
   color: var(--accent);
+}
+
+/* ---- Two-column comparison panels ---- */
+.auth-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.auth-columns > div {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.1rem 1.2rem;
+  background: var(--panel);
+}
+
+.auth-columns h3 {
+  margin-top: 0;
+  font-size: 1rem;
+}
+
+.auth-columns .direction {
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  display: block;
+  margin-bottom: 0.3rem;
 }
 
 /* ---- Setup flow steps ---- */
