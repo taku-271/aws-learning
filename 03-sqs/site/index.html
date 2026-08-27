@@ -179,15 +179,77 @@ aws lambda create-event-source-mapping --function-name ProcessSQSRecord --batch-
   </section>
 
   <section>
-    <h2>今後試したいハンズオン</h2>
-    <div class="note">
-      <ul style="margin:0;">
-        <li>Standard キューと FIFO キューを作成し、送信順序・重複配信の挙動の違いを実際に確認する</li>
-        <li>可視性タイムアウトを短めに設定してわざと処理を遅延させ、メッセージが再配信される様子を観察する</li>
-        <li>DLQ を設定し、<code>maxReceiveCount</code> を超えて失敗したメッセージが DLQ に移動する流れと redrive を試す</li>
-        <li>SQS を Lambda のイベントソースとして登録し、バッチサイズや可視性タイムアウトとの関係を確認する</li>
-      </ul>
-    </div>
+    <h2>ハンズオン手順</h2>
+    <p>いずれも AWS CLI で完結する。リージョンは <code>--region</code> または <code>aws configure</code> の
+      デフォルトリージョンに従う。</p>
+
+    <h3>1. Standard / FIFO キューの挙動差を確認する</h3>
+    <p>代表的なケース: 注文イベントのように「発生順どおりに処理したい/重複を避けたい」要件があるかどうかで
+      キュー種別を選ぶ判断を、実際の送受信結果で確認する。</p>
+    <pre><code>aws sqs create-queue --queue-name standard-demo-queue
+aws sqs create-queue --queue-name fifo-demo-queue.fifo \
+  --attributes FifoQueue=true,ContentBasedDeduplication=true</code></pre>
+    <ol class="flow">
+      <li>Standard キューに <code>A</code><code>B</code><code>C</code> を続けて送信し、<code>receive-message</code>
+        の結果が送信順どおりとは限らないことを確認する。</li>
+      <li>同じ内容を再送し、複数回 <code>receive-message</code> すると重複して受信されうることを確認する。</li>
+      <li>FIFO キューには <code>--message-group-id</code> を付けて同じ3件を送信し、常に送信順どおりに
+        受信できることを確認する。</li>
+      <li>FIFO キューに同一本文を再送し、<code>ContentBasedDeduplication</code>(5分間の重複排除ウィンドウ)
+        により重複配信されないことを確認する。</li>
+      <li>確認後は両キューを <code>delete-queue</code> で削除する。</li>
+    </ol>
+
+    <h3>2. 可視性タイムアウトと再配信を観察する</h3>
+    <p>代表的なケース: ワーカーの処理が長引き、可視性タイムアウト内に <code>DeleteMessage</code> できなかった
+      場合の再配信挙動を検証する。</p>
+    <ol class="flow">
+      <li>可視性タイムアウトを10秒にしたキューを作成し、メッセージを1件送信する。</li>
+      <li><code>receive-message</code> で受信するが、<code>delete-message</code> は呼ばない。</li>
+      <li>15秒待ってから再度 <code>receive-message</code> し、同じメッセージが再び返ってくることを確認する。</li>
+      <li><code>ApproximateReceiveCount</code> 属性で受信回数が増えていることを確認する。</li>
+      <li>今度は <code>change-message-visibility</code> で延長してから処理を完了させ、<code>delete-message</code>
+        で削除して再配信されないことを確認する。</li>
+    </ol>
+
+    <h3>3. DLQ への隔離と redrive を試す</h3>
+    <p>代表的なケース: 特定のメッセージだけが処理に失敗し続け、キュー内の他メッセージをブロックする状況を
+      再現し、DLQ による隔離と redrive による復旧を確認する。</p>
+    <ol class="flow">
+      <li>DLQ を作成し、その <code>QueueArn</code> を控える。</li>
+      <li>メインキューを作成し、<code>RedrivePolicy</code> で DLQ と <code>maxReceiveCount=3</code> を設定する。</li>
+      <li>メッセージを1件送信し、<code>receive-message</code> するが削除せず可視性タイムアウトが切れるのを
+        待つ、を3回繰り返して失敗をシミュレートする。</li>
+      <li>4回目にはメインキューではなく DLQ 側にメッセージが移動していることを確認する。</li>
+      <li><code>start-message-move-task</code> で DLQ から元のキューへ redrive し、メインキューに
+        メッセージが戻ることを確認する(進捗は <code>list-message-move-tasks</code> で確認)。</li>
+    </ol>
+
+    <h3>4. SQS を Lambda のイベントソースとして登録する</h3>
+    <p>代表的なケース: S3 アップロードなど非同期に発生するイベントを SQS 経由で受け取り、Lambda が
+      バッチ処理する構成(サムネイル生成やデータ加工など)を模したハンズオン。</p>
+    <ol class="flow">
+      <li><code>AWSLambdaSQSQueueExecutionRole</code> をアタッチした Lambda 実行ロールを作成する。</li>
+      <li>受信メッセージをログ出力するだけのシンプルな Lambda 関数(タイムアウト短め、例: 10秒)を作成する。</li>
+      <li>可視性タイムアウトを関数タイムアウトの6倍以上(例: 60秒)にしたキューを作成する。</li>
+      <li><code>create-event-source-mapping</code> でバッチサイズを指定して紐付ける。</li>
+      <li>複数メッセージを送信し、CloudWatch Logs でバッチ単位に呼び出されることを確認する。</li>
+      <li>特定メッセージでわざと例外を投げさせ、<code>ReportBatchItemFailures</code>(部分バッチ失敗レポート)
+        の設定有無で再試行対象の範囲が変わることを比較する。</li>
+    </ol>
+
+    <h3>5. CDK / Terraform で IaC 化する</h3>
+    <p>代表的なケース: 手順1〜4で手動確認した「メインキュー + DLQ + Lambda イベントソースマッピング」を
+      再現可能な形でコード化する。</p>
+    <ol class="flow">
+      <li><code>03-sqs/cdk/</code>(または <code>terraform/</code>)を作成し、CDK なら
+        <code>cdk init app --language typescript</code> で初期化する。</li>
+      <li>DLQ・メインキュー(<code>deadLetterQueue</code> / <code>redrive_policy</code> で紐付け、
+        可視性タイムアウトは Lambda タイムアウトの6倍以上)・Lambda 関数・イベントソースマッピングを定義する。</li>
+      <li><code>cdk synth</code> / <code>terraform plan</code> で意図した設定になっているか確認する。</li>
+      <li><code>cdk deploy</code> / <code>terraform apply</code> し、手順1〜4と同じ動作確認を行う。</li>
+      <li>確認後は必ず <code>cdk destroy</code> / <code>terraform destroy</code> で破棄する。</li>
+    </ol>
   </section>
 
   <section>

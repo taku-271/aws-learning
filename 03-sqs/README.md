@@ -145,10 +145,128 @@ aws lambda create-event-source-mapping --function-name ProcessSQSRecord --batch-
 - [Amazon SQS FAQs](https://aws.amazon.com/sqs/faqs/)
 - [Why are my Amazon SQS charges higher than expected?](https://repost.aws/knowledge-center/sqs-high-charges)
 
-## 今後試したいハンズオン
+## ハンズオン手順
 
-- Standard キューと FIFO キューを作成し、送信順序・重複配信の挙動の違いを実際に確認する
-- 可視性タイムアウトを短めに設定した上でわざと処理を遅延させ、メッセージが再配信される様子を観察する
-- DLQ を設定し、`maxReceiveCount` を超えて失敗したメッセージが DLQ に移動する流れと redrive を試す
-- SQS を Lambda のイベントソースとして登録し、バッチサイズや可視性タイムアウトとの関係を確認する
-- CDK または Terraform でキュー(+ DLQ + Lambda トリガー)を IaC 化する
+いずれも AWS CLI で完結する。リージョンは適宜 `--region` で指定するか、`aws configure` の
+デフォルトリージョンを利用する。
+
+### 1. Standard キューと FIFO キューの挙動差を確認する
+
+代表的なケース: 注文イベントのように「発生順どおりに処理したい/重複を避けたい」要件があるかどうかで
+Standard と FIFO のどちらを選ぶべきかを、実際の送受信結果で確認する。
+
+```bash
+# Standard キューを作成
+aws sqs create-queue --queue-name standard-demo-queue
+
+# FIFO キューを作成(名前は必ず .fifo で終える。コンテンツベース重複排除を有効化)
+aws sqs create-queue --queue-name fifo-demo-queue.fifo \
+  --attributes FifoQueue=true,ContentBasedDeduplication=true
+```
+
+1. `create-queue` の戻り値 `QueueUrl` を控える。
+2. Standard キューに `A` `B` `C` の3件を続けて送信する(3回 `send-message`)。
+3. `receive-message --max-number-of-messages 10` で受信し、返ってきた順序が送信順と一致するとは限らないことを確認する。
+4. 同じ内容のメッセージ(例: `A`)をもう一度 `send-message` で送り、`receive-message` を数回叩いて重複して受信されうることを確認する。
+5. FIFO キューには `--message-group-id order-1` を付けて `A` `B` `C` を送信し、`receive-message` の結果が常に送信順どおりであることを確認する。
+6. FIFO キューに同一メッセージ本文を再送し、`ContentBasedDeduplication` により重複配信されない(5分の重複排除ウィンドウ内は無視される)ことを確認する。
+7. 確認後は両キューを削除する。
+
+```bash
+aws sqs delete-queue --queue-url <standard-queue-url>
+aws sqs delete-queue --queue-url <fifo-queue-url>
+```
+
+### 2. 可視性タイムアウトと再配信の挙動を観察する
+
+代表的なケース: ワーカーの処理に時間がかかり、可視性タイムアウト内に `DeleteMessage` できなかった場合に
+メッセージがどう再配信されるかを検証する。
+
+```bash
+# 可視性タイムアウトを10秒に設定したキューを作成
+aws sqs create-queue --queue-name visibility-demo-queue \
+  --attributes VisibilityTimeout=10
+```
+
+1. メッセージを1件送信する。
+2. `receive-message` で受信し、返ってきた `ReceiptHandle` を控える。ここでは **`delete-message` を呼ばない**。
+3. 15秒(可視性タイムアウトの10秒より長く)待ってから再度 `receive-message` を実行し、同じメッセージが
+   再び返ってくることを確認する。
+4. `receive-message --attribute-names ApproximateReceiveCount` で受信回数が増えていることを確認する。
+5. 今度は受信直後に `change-message-visibility` でタイムアウトを延長(ハートビート)し、処理完了後に
+   `delete-message` で削除して、再配信されないことを確認する。
+6. 確認後はキューを削除する。
+
+### 3. DLQ への隔離と redrive を試す
+
+代表的なケース: 特定のメッセージだけが処理に失敗し続け、キュー内の他メッセージの処理をブロックしてしまう
+状況を再現し、DLQ による隔離と redrive による復旧を確認する。
+
+```bash
+# DLQ を作成し、ARN を控える
+aws sqs create-queue --queue-name demo-dlq
+DLQ_ARN=$(aws sqs get-queue-attributes --queue-url <dlq-url> \
+  --attribute-names QueueArn --query 'Attributes.QueueArn' --output text)
+
+# メインキューを作成し、DLQ と maxReceiveCount=3 の RedrivePolicy を設定
+aws sqs create-queue --queue-name demo-main-queue --attributes '{
+  "VisibilityTimeout": "5",
+  "RedrivePolicy": "{\"deadLetterTargetArn\":\"'"$DLQ_ARN"'\",\"maxReceiveCount\":\"3\"}"
+}'
+```
+
+1. メインキューにメッセージを1件送信する。
+2. `receive-message` で受信するが `delete-message` は呼ばず、可視性タイムアウト(5秒)が過ぎるまで待つ、
+   を3回繰り返す(=3回失敗させる)。
+3. 4回目に `receive-message` してもメインキューにはメッセージが無く、代わりに DLQ 側で `receive-message`
+   するとメッセージが移動していることを確認する。
+4. `start-message-move-task` を使って DLQ から元のキューへ再投入(redrive)する。
+
+```bash
+aws sqs start-message-move-task --source-arn "$DLQ_ARN"
+```
+
+5. しばらくしてメインキューに `receive-message` すると、redrive されたメッセージが戻ってきていることを
+   確認する(移動状況は `list-message-move-tasks` で確認できる)。
+6. 確認後は両キューを削除する。
+
+### 4. SQS を Lambda のイベントソースとして登録する
+
+代表的なケース: S3 へのアップロードなど非同期に発生するイベントを SQS 経由で受け取り、Lambda が
+バッチ処理する構成(サムネイル生成やデータ加工など)を模したハンズオン。
+
+1. Lambda 実行ロールを作成し、`AWSLambdaSQSQueueExecutionRole` マネージドポリシーをアタッチする。
+2. 受信したメッセージ本文を `print`/`console.log` するだけのシンプルな Lambda 関数を作成する
+   (関数タイムアウトは短め、例: 10秒)。
+3. 可視性タイムアウトを Lambda の関数タイムアウトの6倍以上(例: 60秒)にしたキューを作成する。
+4. イベントソースマッピングを作成する。
+
+```bash
+aws lambda create-event-source-mapping --function-name ProcessSQSRecord --batch-size 10 \
+  --event-source-arn arn:aws:sqs:us-east-1:111122223333:my-queue
+```
+
+5. キューに複数メッセージを送信し、CloudWatch Logs で Lambda がバッチ単位で呼び出されていることを確認する。
+6. 関数内でメッセージ本文に応じてわざと例外を投げるようにし、可視性タイムアウト経過後にそのメッセージだけが
+   再度呼び出される(バッチ全体は成功したメッセージが削除され、失敗したメッセージだけ残る)ことを、
+   `ReportBatchItemFailures`(部分バッチ失敗レポート)の設定有無で比較する。
+7. 確認後はイベントソースマッピング・Lambda関数・キューを削除する。
+
+### 5. CDK または Terraform でキュー(+ DLQ + Lambda トリガー)を IaC 化する
+
+代表的なケース: 上記1〜4で手動確認した構成(メインキュー + DLQ + Lambda のイベントソースマッピング)を、
+再現可能な形でコード化する。
+
+1. `03-sqs/cdk/`(または `03-sqs/terraform/`)ディレクトリを作成し、CDK なら `cdk init app --language typescript`、
+   Terraform なら `main.tf` から書き始める。
+2. 以下のリソースを定義する。
+   - DLQ(`sqs.Queue` / `aws_sqs_queue`)
+   - メインキュー。`deadLetterQueue`(CDK)または `redrive_policy`(Terraform)で DLQ と `maxReceiveCount` を紐付け、
+     `visibilityTimeout` を Lambda タイムアウトの6倍以上に設定
+   - Lambda 関数(手順4で使ったハンドラーを流用)
+   - イベントソースマッピング(CDK: `lambda.addEventSource(new SqsEventSource(queue, { batchSize: ... }))`、
+     Terraform: `aws_lambda_event_source_mapping`)
+3. `cdk synth` / `terraform plan` で意図した設定(DLQ の紐付け、タイムアウトの関係)になっているか確認する。
+4. `cdk deploy` / `terraform apply` でデプロイし、手順1〜4と同じ手順(メッセージ送信・受信・失敗シミュレーション)を
+   実行して動作が一致することを確認する。
+5. 確認後は `cdk destroy` / `terraform destroy` で必ず破棄する。
