@@ -10,218 +10,238 @@
 <div class="page">
   <a class="back-link" href="../../index.html">&larr; 学習トピック一覧へ</a>
 
-  <div class="topic-number">01</div>
-  <h1>Amazon Bedrock Managed Knowledge Base</h1>
-  <p class="lead">
-    ベクトルDBの構築・運用を自分でしなくてよい、完全マネージド型のRAG（Retrieval-Augmented
-    Generation）サービスについて学んだメモ。
-  </p>
-  <span class="pill">2026年6月 GA</span>
+  <header class="hero">
+    <div class="topic-number">TOPIC 01</div>
+    <h1>Amazon Bedrock Managed Knowledge Base</h1>
+    <p class="lead">
+      ベクトルDBの構築・運用を自分でしなくてよい、完全マネージド型のRAG（Retrieval-Augmented
+      Generation）サービスについて学んだメモ。
+    </p>
+    <div class="pill-row">
+      <span class="pill">2026年6月 GA</span>
+    </div>
+  </header>
 
-  <h2>Bedrock Knowledge Bases とは</h2>
-  <p>
-    Amazon Bedrock Knowledge Bases は、生成AIアプリケーションに RAG を実装するための
-    Bedrock の機能。データの場所を指定するだけで、Bedrock がドキュメントの取得・チャンク分割・
-    埋め込みベクトル化・ベクトルストアへの保存/同期までを内部で行う。カスタムのデータ統合や
-    データ同期の実装は不要で、マルチターン会話のためのセッションコンテキスト管理も組み込み。
-  </p>
-  <p>
-    Bedrock Agent に接続すると、エージェントがユーザー入力に応じて適切な Knowledge Base を
-    自動選択し、取得情報をプロンプトに追加してくれる。取得結果には出典（citation）が付くため、
-    ハルシネーション抑制とファクトチェックのしやすさにつながる。
-  </p>
+  <section>
+    <h2>Bedrock Knowledge Bases とは</h2>
+    <p>
+      Amazon Bedrock Knowledge Bases は、生成AIアプリケーションに RAG を実装するための
+      Bedrock の機能。データの場所を指定するだけで、Bedrock がドキュメントの取得・チャンク分割・
+      埋め込みベクトル化・ベクトルストアへの保存/同期までを内部で行う。カスタムのデータ統合や
+      データ同期の実装は不要で、マルチターン会話のためのセッションコンテキスト管理も組み込み。
+    </p>
+    <p>
+      Bedrock Agent に接続すると、エージェントがユーザー入力に応じて適切な Knowledge Base を
+      自動選択し、取得情報をプロンプトに追加してくれる。取得結果には出典（citation）が付くため、
+      ハルシネーション抑制とファクトチェックのしやすさにつながる。
+    </p>
+  </section>
 
-  <h2>2種類の Knowledge Base</h2>
-  <p>
-    現在、性質の異なる2つの作成方法がある。「Managed Knowledge Base」は
-    Bedrock Knowledge Bases 全体の別名ではなく、2026年6月にGAした特定の作成モードを指す点に注意。
-  </p>
-  <table>
-    <thead>
-      <tr>
-        <th></th>
-        <th>Managed Knowledge Base（新）</th>
-        <th>Knowledge base with vector store（従来）</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>GA時期</td>
-        <td>2026年6月</td>
-        <td>2023年11月</td>
-      </tr>
-      <tr>
-        <td>ベクトルストア</td>
-        <td>Bedrock が完全管理（自分で用意しない）</td>
-        <td>自分で OpenSearch Serverless / Aurora / Pinecone 等を用意（Quick create も可）</td>
-      </tr>
-      <tr>
-        <td>データソース</td>
-        <td>S3, SharePoint, Confluence, Google Drive, OneDrive, Web Crawler（ネイティブ6種）</td>
-        <td>S3, Confluence, Salesforce, SharePoint, Web Crawler など</td>
-      </tr>
-      <tr>
-        <td>検索機能</td>
-        <td>ハイブリッド検索・ドキュメントランキング・agentic retrieval が標準</td>
-        <td>チャンク戦略・埋め込みモデル・再ランカーなどを個別に設定</td>
-      </tr>
-      <tr>
-        <td>向いている用途</td>
-        <td>素早く本番品質のRAGを構築したい場合（AWS推奨）</td>
-        <td>ベクトルストアの選択肢や設定を細かく制御したい場合</td>
-      </tr>
-    </tbody>
-  </table>
+  <section>
+    <h2>2種類の Knowledge Base</h2>
+    <p>
+      現在、性質の異なる2つの作成方法がある。「Managed Knowledge Base」は
+      Bedrock Knowledge Bases 全体の別名ではなく、2026年6月にGAした特定の作成モードを指す点に注意。
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Managed Knowledge Base（新）</th>
+          <th>Knowledge base with vector store（従来）</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>GA時期</td>
+          <td>2026年6月</td>
+          <td>2023年11月</td>
+        </tr>
+        <tr>
+          <td>ベクトルストア</td>
+          <td>Bedrock が完全管理（自分で用意しない）</td>
+          <td>自分で OpenSearch Serverless / Aurora / Pinecone 等を用意（Quick create も可）</td>
+        </tr>
+        <tr>
+          <td>データソース</td>
+          <td>S3, SharePoint, Confluence, Google Drive, OneDrive, Web Crawler（ネイティブ6種）</td>
+          <td>S3, Confluence, Salesforce, SharePoint, Web Crawler など</td>
+        </tr>
+        <tr>
+          <td>検索機能</td>
+          <td>ハイブリッド検索・ドキュメントランキング・agentic retrieval が標準</td>
+          <td>チャンク戦略・埋め込みモデル・再ランカーなどを個別に設定</td>
+        </tr>
+        <tr>
+          <td>向いている用途</td>
+          <td>素早く本番品質のRAGを構築したい場合（AWS推奨）</td>
+          <td>ベクトルストアの選択肢や設定を細かく制御したい場合</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
 
-  <h2>Managed Knowledge Base の特徴</h2>
-  <ul class="feature-grid">
-    <li><strong>インフラ管理不要</strong>ベクトルDB・データパイプライン・検索基盤の運用が不要。埋め込みモデルも Default にすれば自動選択・自動管理。</li>
-    <li><strong>ネイティブコネクタ6種</strong>Amazon S3, SharePoint, Confluence, Google Drive, OneDrive, Web Crawler。自動データ同期に対応。</li>
-    <li><strong>ハイブリッド検索</strong>キーワード検索とセマンティック検索を組み合わせ。</li>
-    <li><strong>ドキュメントランキング</strong>検索結果を re-ranking して精度を向上。</li>
-    <li><strong>agentic retrieval</strong>複雑なマルチホップクエリに対し、クエリプランニング・中間応答の評価・再ランキングを自動オーケストレーション。</li>
-    <li><strong>マルチモーダル対応</strong>テキストに加え動画・音声・画像を横断した Knowledge Base を構築可能。</li>
-    <li><strong>AgentCore とのネイティブ統合</strong>権限の自動生成やオブザーバビリティが組み込みでエージェントに接続できる。</li>
-    <li><strong>対応リージョン</strong>US East (N. Virginia), US West (Oregon), Asia Pacific (Sydney, Tokyo), Europe (Dublin, Frankfurt, London), AWS GovCloud (US-West)</li>
-  </ul>
+  <section>
+    <h2>Managed Knowledge Base の特徴</h2>
+    <ul class="card-grid">
+      <li><strong>インフラ管理不要</strong>ベクトルDB・データパイプライン・検索基盤の運用が不要。埋め込みモデルも Default にすれば自動選択・自動管理。</li>
+      <li><strong>ネイティブコネクタ6種</strong>Amazon S3, SharePoint, Confluence, Google Drive, OneDrive, Web Crawler。自動データ同期に対応。</li>
+      <li><strong>ハイブリッド検索</strong>キーワード検索とセマンティック検索を組み合わせ。</li>
+      <li><strong>ドキュメントランキング</strong>検索結果を re-ranking して精度を向上。</li>
+      <li><strong>agentic retrieval</strong>複雑なマルチホップクエリに対し、クエリプランニング・中間応答の評価・再ランキングを自動オーケストレーション。</li>
+      <li><strong>マルチモーダル対応</strong>テキストに加え動画・音声・画像を横断した Knowledge Base を構築可能。</li>
+      <li><strong>AgentCore とのネイティブ統合</strong>権限の自動生成やオブザーバビリティが組み込みでエージェントに接続できる。</li>
+      <li><strong>対応リージョン</strong>US East (N. Virginia), US West (Oregon), Asia Pacific (Sydney, Tokyo), Europe (Dublin, Frankfurt, London), AWS GovCloud (US-West)</li>
+    </ul>
+  </section>
 
-  <h2>クエリ用API</h2>
-  <p>Knowledge Base（Managed / vector store 型 いずれも共通）へは以下の2つのAPIで問い合わせる。</p>
-  <ul>
-    <li>
-      <strong><code>RetrieveAndGenerate</code></strong> —
-      クエリを埋め込みに変換 → Knowledge Base を検索 → 検索結果をコンテキストとしてプロンプトに追加
-      → LLMが生成した回答を返す、という一連の流れをまとめて実行。会話の短期記憶（セッションコンテキスト）も管理する。
-    </li>
-    <li>
-      <strong><code>Retrieve</code></strong> —
-      検索結果（関連チャンク）のみを返す。生成は行わず、後続の独自ワークフロー（関連度評価、別の回答生成ロジックなど）に使う。
-      LangChain の <code>AmazonKnowledgeBasesRetriever</code> などから利用できる。
-    </li>
-  </ul>
+  <section>
+    <h2>クエリ用API</h2>
+    <p>Knowledge Base（Managed / vector store 型 いずれも共通）へは以下の2つのAPIで問い合わせる。</p>
+    <ul>
+      <li>
+        <strong><code>RetrieveAndGenerate</code></strong> —
+        クエリを埋め込みに変換 → Knowledge Base を検索 → 検索結果をコンテキストとしてプロンプトに追加
+        → LLMが生成した回答を返す、という一連の流れをまとめて実行。会話の短期記憶（セッションコンテキスト）も管理する。
+      </li>
+      <li>
+        <strong><code>Retrieve</code></strong> —
+        検索結果（関連チャンク）のみを返す。生成は行わず、後続の独自ワークフロー（関連度評価、別の回答生成ロジックなど）に使う。
+        LangChain の <code>AmazonKnowledgeBasesRetriever</code> などから利用できる。
+      </li>
+    </ul>
+  </section>
 
-  <h2>Managed Knowledge Base の作り方（コンソール手順の概要）</h2>
-  <ol>
-    <li>Bedrock コンソール → <strong>Knowledge bases</strong> → <strong>Create</strong> → <strong>Managed Knowledge Base</strong></li>
-    <li>Knowledge Base 名・説明を入力</li>
-    <li>Embeddings model を選択（<strong>Default embedding model</strong> を選ぶと Bedrock が自動選択・管理）</li>
-    <li>データソースを接続（まずは S3 が試しやすい）</li>
-    <li>作成後、データソースに対して ingestion job を実行してコンテンツを検索可能にする</li>
-  </ol>
-  <p>
-    CloudFormation/CDK では <code>AWS::Bedrock::KnowledgeBase</code> リソースの
-    <code>KnowledgeBaseConfiguration</code> に <code>ManagedKnowledgeBaseConfiguration</code>（Managed型）か
-    <code>VectorKnowledgeBaseConfiguration</code>（vector store型）のどちらかを指定する形になっている。
-  </p>
+  <section>
+    <h2>Managed Knowledge Base の作り方（コンソール手順の概要）</h2>
+    <ol class="flow">
+      <li>Bedrock コンソール → <strong>Knowledge bases</strong> → <strong>Create</strong> → <strong>Managed Knowledge Base</strong></li>
+      <li>Knowledge Base 名・説明を入力</li>
+      <li>Embeddings model を選択（<strong>Default embedding model</strong> を選ぶと Bedrock が自動選択・管理）</li>
+      <li>データソースを接続（まずは S3 が試しやすい）</li>
+      <li>作成後、データソースに対して ingestion job を実行してコンテンツを検索可能にする</li>
+    </ol>
+    <p>
+      CloudFormation/CDK では <code>AWS::Bedrock::KnowledgeBase</code> リソースの
+      <code>KnowledgeBaseConfiguration</code> に <code>ManagedKnowledgeBaseConfiguration</code>（Managed型）か
+      <code>VectorKnowledgeBaseConfiguration</code>（vector store型）のどちらかを指定する形になっている。
+    </p>
+  </section>
 
-  <h2>コスト比較（S3 Vectors / OpenSearch Serverless / Aurora Serverless との比較）</h2>
-  <p>
-    vector store 型 Knowledge Base で使える代表的なベクトルストアと、Managed Knowledge Base
-    の料金体系を比べてみた。
-  </p>
+  <section>
+    <h2>コスト比較（S3 Vectors / OpenSearch Serverless / Aurora Serverless との比較）</h2>
+    <p>
+      vector store 型 Knowledge Base で使える代表的なベクトルストアと、Managed Knowledge Base
+      の料金体系を比べてみた。
+    </p>
 
-  <h3>Managed Knowledge Base の料金体系</h3>
-  <p>
-    ストレージ課金 + API呼び出し課金のシンプルなモデル。マルチモーダルパース・埋め込み・
-    再ランキングはすべて込み（カスタムモデルに差し替えた場合のみ通常のBedrockモデル料金が
-    別途発生）。
-  </p>
-  <table>
-    <thead>
-      <tr><th>項目</th><th>単価</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>インデックスストレージ</td><td>$5.00 / GB / 月</td></tr>
-      <tr><td>標準 Retrieve</td><td>$1.00 / 1,000件</td></tr>
-      <tr><td>Agentic Retrieve</td><td>$4.00 / 1,000件（+ 内部で発生する Retrieve 呼び出し分も別途 $1.00/1,000件で加算）</td></tr>
-      <tr><td>マルチモーダルパース・埋め込み・リランカー</td><td>無料込み</td></tr>
-    </tbody>
-  </table>
-  <p>
-    AWS公式の試算例（SharePointから50GBを取り込み、月10万クエリのケース）：
-    標準Retrieveのみでストレージ$250+Retrieve$100=<strong>月$350</strong>、
-    Agentic Retrieve（平均2回の内部呼び出し）だとストレージ$250+Agentic$400+内部Retrieve$200=<strong>月$850</strong>。
-  </p>
+    <h3>Managed Knowledge Base の料金体系</h3>
+    <p>
+      ストレージ課金 + API呼び出し課金のシンプルなモデル。マルチモーダルパース・埋め込み・
+      再ランキングはすべて込み（カスタムモデルに差し替えた場合のみ通常のBedrockモデル料金が
+      別途発生）。
+    </p>
+    <table>
+      <thead>
+        <tr><th>項目</th><th>単価</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>インデックスストレージ</td><td>$5.00 / GB / 月</td></tr>
+        <tr><td>標準 Retrieve</td><td>$1.00 / 1,000件</td></tr>
+        <tr><td>Agentic Retrieve</td><td>$4.00 / 1,000件（+ 内部で発生する Retrieve 呼び出し分も別途 $1.00/1,000件で加算）</td></tr>
+        <tr><td>マルチモーダルパース・埋め込み・リランカー</td><td>無料込み</td></tr>
+      </tbody>
+    </table>
+    <p>
+      AWS公式の試算例（SharePointから50GBを取り込み、月10万クエリのケース）：
+      標準Retrieveのみでストレージ$250+Retrieve$100=<strong>月$350</strong>、
+      Agentic Retrieve（平均2回の内部呼び出し）だとストレージ$250+Agentic$400+内部Retrieve$200=<strong>月$850</strong>。
+    </p>
 
-  <h3>自前のベクトルストアを使う場合（vector store 型 Knowledge Base）</h3>
-  <p>「埋め込みモデルのトークン課金」+「ベクトルストア自体の課金」の二重構造になる。</p>
-  <table>
-    <thead>
-      <tr><th>ベクトルストア</th><th>料金モデル</th><th>特徴的なコスト構造</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>OpenSearch Serverless</td>
-        <td>OCU時間課金、$0.24/OCU時間</td>
-        <td>最初のコレクションは indexing/search 合わせて最低4 OCUが常時課金。4 OCU×24h×30日=<strong>月$691.20が「待機しているだけ」でかかる最低ライン</strong>。ストレージは別途GB月課金。</td>
-      </tr>
-      <tr>
-        <td>Aurora Serverless（pgvector）</td>
-        <td>ACU時間課金（目安 $0.12/ACU時間）</td>
-        <td>最小0 ACUまでオートポーズ可能→アイドル時はコンピュート課金ゼロにできる。ストレージは概ね$0.10/GB程度。</td>
-      </tr>
-      <tr>
-        <td>S3 Vectors</td>
-        <td>ストレージ $0.06/GB + PUT/QUERYのリクエスト課金</td>
-        <td>プロビジョニング不要のサーバーレス。特化型ベクトルDB比で最大90%のコスト削減を謳う。低頻度アクセス・アーカイブ向け。</td>
-      </tr>
-    </tbody>
-  </table>
-  <p>
-    <strong>ポイント</strong>: OpenSearch Serverless は「動いていなくても」月$700弱かかる最低ラインがあるため、
-    小規模な学習用途やトラフィックが少ないアプリでは Managed KB の方が安くなるケースが多い。
-    一方、Aurora ServerlessやS3 VectorsはアイドルコストがOpenSearchより低く抑えられる。
-  </p>
+    <h3>自前のベクトルストアを使う場合（vector store 型 Knowledge Base）</h3>
+    <p>「埋め込みモデルのトークン課金」+「ベクトルストア自体の課金」の二重構造になる。</p>
+    <table>
+      <thead>
+        <tr><th>ベクトルストア</th><th>料金モデル</th><th>特徴的なコスト構造</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>OpenSearch Serverless</td>
+          <td>OCU時間課金、$0.24/OCU時間</td>
+          <td>最初のコレクションは indexing/search 合わせて最低4 OCUが常時課金。4 OCU×24h×30日=<strong>月$691.20が「待機しているだけ」でかかる最低ライン</strong>。ストレージは別途GB月課金。</td>
+        </tr>
+        <tr>
+          <td>Aurora Serverless（pgvector）</td>
+          <td>ACU時間課金（目安 $0.12/ACU時間）</td>
+          <td>最小0 ACUまでオートポーズ可能→アイドル時はコンピュート課金ゼロにできる。ストレージは概ね$0.10/GB程度。</td>
+        </tr>
+        <tr>
+          <td>S3 Vectors</td>
+          <td>ストレージ $0.06/GB + PUT/QUERYのリクエスト課金</td>
+          <td>プロビジョニング不要のサーバーレス。特化型ベクトルDB比で最大90%のコスト削減を謳う。低頻度アクセス・アーカイブ向け。</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      <strong>ポイント</strong>: OpenSearch Serverless は「動いていなくても」月$700弱かかる最低ラインがあるため、
+      小規模な学習用途やトラフィックが少ないアプリでは Managed KB の方が安くなるケースが多い。
+      一方、Aurora ServerlessやS3 VectorsはアイドルコストがOpenSearchより低く抑えられる。
+    </p>
+  </section>
 
-  <h2>パフォーマンス比較</h2>
-  <table>
-    <thead>
-      <tr><th>ベクトルストア</th><th>レイテンシ目安</th><th>得意な領域</th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>OpenSearch Serverless</td>
-        <td>sub-10ms（高スループット・低レイテンシ）</td>
-        <td>高頻度クエリ、リアルタイム性が必要なアプリ、全文検索+ベクトル検索の併用</td>
-      </tr>
-      <tr>
-        <td>Aurora（pgvector）</td>
-        <td>数ミリ秒〜1桁ms（直接クエリ）</td>
-        <td>リレーショナルDBとベクトル検索を同居させたい場合</td>
-      </tr>
-      <tr>
-        <td>S3 Vectors</td>
-        <td>コールドで1秒未満、ウォームで約100ms</td>
-        <td>数十億ベクトル規模の低頻度アクセス・長期保存（RAGでも「たまにしか検索されない」用途向き）</td>
-      </tr>
-      <tr>
-        <td>Managed Knowledge Base</td>
-        <td>非公開（内部ストレージ層はAWSが最適化・非開示）</td>
-        <td>ハイブリッド検索・ドキュメントランキング・agentic retrieval が標準搭載。同等機能を自前構築するとかなりの追加実装が必要</td>
-      </tr>
-    </tbody>
-  </table>
+  <section>
+    <h2>パフォーマンス比較</h2>
+    <table>
+      <thead>
+        <tr><th>ベクトルストア</th><th>レイテンシ目安</th><th>得意な領域</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>OpenSearch Serverless</td>
+          <td>sub-10ms（高スループット・低レイテンシ）</td>
+          <td>高頻度クエリ、リアルタイム性が必要なアプリ、全文検索+ベクトル検索の併用</td>
+        </tr>
+        <tr>
+          <td>Aurora（pgvector）</td>
+          <td>数ミリ秒〜1桁ms（直接クエリ）</td>
+          <td>リレーショナルDBとベクトル検索を同居させたい場合</td>
+        </tr>
+        <tr>
+          <td>S3 Vectors</td>
+          <td>コールドで1秒未満、ウォームで約100ms</td>
+          <td>数十億ベクトル規模の低頻度アクセス・長期保存（RAGでも「たまにしか検索されない」用途向き）</td>
+        </tr>
+        <tr>
+          <td>Managed Knowledge Base</td>
+          <td>非公開（内部ストレージ層はAWSが最適化・非開示）</td>
+          <td>ハイブリッド検索・ドキュメントランキング・agentic retrieval が標準搭載。同等機能を自前構築するとかなりの追加実装が必要</td>
+        </tr>
+      </tbody>
+    </table>
 
-  <h3>使い分けの指針</h3>
-  <ul>
-    <li><strong>とにかく早く・安く始めたい / 小〜中規模データ / 運用コストをかけたくない</strong> — Managed KB（$5/GB + 従量課金、待機コストなし）</li>
-    <li><strong>超高スループット・sub-10msのレイテンシが必須</strong> — OpenSearch Serverless（ただし待機コスト月$700弱は覚悟）</li>
-    <li><strong>リレーショナルクエリとベクトル検索を同じDBでやりたい、トラフィックが波がある</strong> — Aurora Serverless + pgvector（オートポーズでコスト圧縮可）</li>
-    <li><strong>数十億ベクトル規模を激安で長期保存、検索頻度は低くてよい</strong> — S3 Vectors（ストレージ最安、レイテンシは妥協）</li>
-  </ul>
+    <h3>使い分けの指針</h3>
+    <ul>
+      <li><strong>とにかく早く・安く始めたい / 小〜中規模データ / 運用コストをかけたくない</strong> — Managed KB（$5/GB + 従量課金、待機コストなし）</li>
+      <li><strong>超高スループット・sub-10msのレイテンシが必須</strong> — OpenSearch Serverless（ただし待機コスト月$700弱は覚悟）</li>
+      <li><strong>リレーショナルクエリとベクトル検索を同じDBでやりたい、トラフィックが波がある</strong> — Aurora Serverless + pgvector（オートポーズでコスト圧縮可）</li>
+      <li><strong>数十億ベクトル規模を激安で長期保存、検索頻度は低くてよい</strong> — S3 Vectors（ストレージ最安、レイテンシは妥協）</li>
+    </ul>
+  </section>
 
-  <h2>参考リンク</h2>
-  <ul class="refs">
-    <li><a href="https://aws.amazon.com/bedrock/knowledge-bases/">Amazon Bedrock Knowledge Bases 製品ページ</a></li>
-    <li><a href="https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-bedrock-managed-knowledge-base/">Amazon Bedrock Managed Knowledge Base is now generally available（What's New, 2026/6/17）</a></li>
-    <li><a href="https://docs.aws.amazon.com/prescriptive-guidance/latest/retrieval-augmented-generation-options/rag-fully-managed-bedrock.html">Knowledge bases for Amazon Bedrock（Prescriptive Guidance）</a></li>
-    <li><a href="https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base-build.html">Build a knowledge base with vector stores（User Guide）</a></li>
-    <li><a href="https://aws.amazon.com/blogs/aws/knowledge-bases-now-delivers-fully-managed-rag-experience-in-amazon-bedrock/">Knowledge Bases now delivers fully managed RAG experience in Amazon Bedrock（AWS Blog）</a></li>
-    <li><a href="https://aws.amazon.com/bedrock/pricing/">Amazon Bedrock Pricing（Knowledge Bases セクション）</a></li>
-    <li><a href="https://aws.amazon.com/blogs/machine-learning/build-enterprise-search-for-agents-with-amazon-bedrock-managed-knowledge-base/">Build enterprise search for agents with Amazon Bedrock Managed Knowledge Base（AWS Blog）</a></li>
-    <li><a href="https://docs.aws.amazon.com/prescriptive-guidance/latest/choosing-an-aws-vector-database-for-rag-use-cases/vector-db-options.html">Vector database options / Cost comparisons（Prescriptive Guidance）</a></li>
-    <li><a href="https://aws.amazon.com/opensearch-service/pricing/">Amazon OpenSearch Service Pricing</a></li>
-  </ul>
+  <section>
+    <h2>参考リンク</h2>
+    <ul class="refs">
+      <li><a href="https://aws.amazon.com/bedrock/knowledge-bases/">Amazon Bedrock Knowledge Bases 製品ページ</a></li>
+      <li><a href="https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-bedrock-managed-knowledge-base/">Amazon Bedrock Managed Knowledge Base is now generally available（What's New, 2026/6/17）</a></li>
+      <li><a href="https://docs.aws.amazon.com/prescriptive-guidance/latest/retrieval-augmented-generation-options/rag-fully-managed-bedrock.html">Knowledge bases for Amazon Bedrock（Prescriptive Guidance）</a></li>
+      <li><a href="https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base-build.html">Build a knowledge base with vector stores（User Guide）</a></li>
+      <li><a href="https://aws.amazon.com/blogs/aws/knowledge-bases-now-delivers-fully-managed-rag-experience-in-amazon-bedrock/">Knowledge Bases now delivers fully managed RAG experience in Amazon Bedrock（AWS Blog）</a></li>
+      <li><a href="https://aws.amazon.com/bedrock/pricing/">Amazon Bedrock Pricing（Knowledge Bases セクション）</a></li>
+      <li><a href="https://aws.amazon.com/blogs/machine-learning/build-enterprise-search-for-agents-with-amazon-bedrock-managed-knowledge-base/">Build enterprise search for agents with Amazon Bedrock Managed Knowledge Base（AWS Blog）</a></li>
+      <li><a href="https://docs.aws.amazon.com/prescriptive-guidance/latest/choosing-an-aws-vector-database-for-rag-use-cases/vector-db-options.html">Vector database options / Cost comparisons（Prescriptive Guidance）</a></li>
+      <li><a href="https://aws.amazon.com/opensearch-service/pricing/">Amazon OpenSearch Service Pricing</a></li>
+    </ul>
+  </section>
 
   <footer>
     リポジトリの学習メモ全文は
