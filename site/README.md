@@ -71,6 +71,77 @@ npm run deploy    # CloudFront + S3 を含むスタックをデプロイ(AWS CLI
 npm run destroy
 ```
 
+## GitHub Actionsでの自動デプロイ
+
+`main` に `site/**` または `<番号>-*/site/**` の変更がpushされると、
+`.github/workflows/deploy-site.yml` が自動で `npm run deploy` を実行します。手動で
+`npm run deploy` を叩く必要はありません(ローカルからの手動デプロイも引き続き可能です)。
+
+認証はOIDC(GitHub Actions ↔ AWS IAM Role)を使い、長期のアクセスキーはリポジトリに置きません。
+初回のみ、AWSアカウント側で以下を手動セットアップしてください(このリポジトリのコードだけでは完結しません)。
+
+1. GitHubをIDプロバイダとして登録(既に他のワークフローで登録済みなら不要):
+   ```bash
+   aws iam create-open-id-connect-provider \
+     --url https://token.actions.githubusercontent.com \
+     --client-id-list sts.amazonaws.com \
+     --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+   ```
+2. GitHub Actionsからのみ引き受けられるIAM Roleを作成し、信頼ポリシーを以下のようにする
+   (`<ACCOUNT_ID>` は自分のAWSアカウントIDに置き換え。`sub`をmainブランチに限定しているので、
+   フォークや他ブランチからは引き受けられません):
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Principal": {
+           "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
+         },
+         "Action": "sts:AssumeRoleWithWebIdentity",
+         "Condition": {
+           "StringEquals": {
+             "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+           },
+           "StringLike": {
+             "token.actions.githubusercontent.com:sub": "repo:taku-271/aws-learning:ref:refs/heads/main"
+           }
+         }
+       }
+     ]
+   }
+   ```
+   権限ポリシーは、ローカルで `cdk bootstrap` 済みであれば以下の最小権限で足ります。CDKは
+   `cdk bootstrap` が作成したRole(`cdk-hnb659fds-*`)側に実際にS3・CloudFront・CloudFormationを
+   操作する権限を持たせる設計になっているため、GitHub Actions用Roleにはそれらをassumeする権限
+   だけを与えれば十分です(`<ACCOUNT_ID>`・`<REGION>` は実際の値に置き換え。正確なRole名は
+   `aws iam list-roles --query "Roles[?starts_with(RoleName, 'cdk-hnb659fds')].{Name:RoleName,Arn:Arn}"`
+   で確認できます):
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Sid": "AssumeCdkBootstrapRoles",
+         "Effect": "Allow",
+         "Action": "sts:AssumeRole",
+         "Resource": [
+           "arn:aws:iam::<ACCOUNT_ID>:role/cdk-hnb659fds-deploy-role-<ACCOUNT_ID>-<REGION>",
+           "arn:aws:iam::<ACCOUNT_ID>:role/cdk-hnb659fds-file-publishing-role-<ACCOUNT_ID>-<REGION>",
+           "arn:aws:iam::<ACCOUNT_ID>:role/cdk-hnb659fds-lookup-role-<ACCOUNT_ID>-<REGION>"
+         ]
+       }
+     ]
+   }
+   ```
+   `hnb659fds` はCDKのデフォルトqualifier(`cdk.json` でカスタマイズしていなければそのまま)。
+   Dockerイメージアセットは使わないため `image-publishing-role` は含めていません。
+3. 作成したRoleのARNをリポジトリの Settings → Secrets and variables → Actions に
+   `AWS_DEPLOY_ROLE_ARN`(Secret)として、デプロイ先リージョンを `AWS_REGION`(Variable)として登録します。
+
+セットアップ後は、`main` にマージされるたびに自動でサイトが更新されます。
+
 ## 注意
 
 - `site/aws-blocks/` はこのサイトを配信するためだけのAWS Blocksアプリで、他のトピックの `cdk/`・
