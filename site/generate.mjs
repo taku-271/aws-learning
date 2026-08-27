@@ -1,14 +1,14 @@
-// Renders every topic's README.md (and the repo's top-level README.md) into a
-// static HTML site under dist/. This is a straight markdown -> HTML
-// conversion, not a curated summary — the goal is a browsable copy of the
-// same notes, viewable anytime (while studying, not just once a topic is
-// "done").
-import { readFile, writeFile, mkdir, rm, readdir, stat, copyFile } from 'node:fs/promises';
+// Collects each topic's hand-authored public page (<topic>/site/index.html,
+// plus any assets alongside it such as its own CSS) into a single static
+// site under dist/. Each topic's page is custom-designed by whoever writes
+// it — this script does not template or convert anything, it only copies
+// files and builds the homepage list linking to them.
+import { writeFile, mkdir, rm, readdir, stat, cp } from 'node:fs/promises';
 import { watch } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { dirname, join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { marked } from 'marked';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, '..');
@@ -21,13 +21,13 @@ async function findTopics() {
   const topics = [];
   for (const entry of entries) {
     if (!entry.isDirectory() || !/^\d+-/.test(entry.name)) continue;
-    const readmePath = join(repoRoot, entry.name, 'README.md');
+    const sitePagePath = join(repoRoot, entry.name, 'site', 'index.html');
     try {
-      await stat(readmePath);
+      await stat(sitePagePath);
     } catch {
-      continue;
+      continue; // topic has no published page yet
     }
-    topics.push({ dir: entry.name, readmePath });
+    topics.push({ dir: entry.name, sourceDir: join(repoRoot, entry.name, 'site') });
   }
   topics.sort((a, b) => a.dir.localeCompare(b.dir, 'en', { numeric: true }));
   return topics;
@@ -35,52 +35,20 @@ async function findTopics() {
 
 function topicLabel(dir) {
   const match = dir.match(/^(\d+)-(.+)$/);
-  if (!match) return dir;
+  if (!match) return { number: dir, name: dir };
   const [, number, name] = match;
   return { number, name: name.replace(/-/g, ' ') };
 }
 
-function layout({ title, bodyHtml, backLink }) {
-  return `<!doctype html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${title}</title>
-<link rel="stylesheet" href="${backLink ? '../../style.css' : 'style.css'}">
-</head>
-<body>
-<div class="page">
-${backLink ? `<a class="back" href="${backLink}">&larr; 一覧に戻る</a>` : ''}
-<article class="markdown-body">
-${bodyHtml}
-</article>
-</div>
-</body>
-</html>
-`;
-}
-
-async function renderTopicPage(topic) {
-  const markdown = await readFile(topic.readmePath, 'utf8');
-  const html = marked.parse(markdown);
-  const { number, name } = topicLabel(topic.dir);
-  const page = layout({
-    title: `${number}. ${name} | ${SITE_TITLE}`,
-    bodyHtml: html,
-    backLink: '../../index.html',
-  });
+async function copyTopicPage(topic) {
   const outDir = join(distDir, 'topics', topic.dir);
-  await mkdir(outDir, { recursive: true });
-  await writeFile(join(outDir, 'index.html'), page, 'utf8');
+  await cp(topic.sourceDir, outDir, { recursive: true });
 }
 
 async function renderIndexPage(topics) {
-  const intro = await readFile(join(repoRoot, 'README.md'), 'utf8').catch(() => '');
-
   const list =
     topics.length === 0
-      ? '<p>まだ学習トピックがありません。</p>'
+      ? '<p>まだ公開されているトピックがありません。</p>'
       : `<ul class="topic-list">${topics
           .map((t) => {
             const { number, name } = topicLabel(t.dir);
@@ -88,8 +56,24 @@ async function renderIndexPage(topics) {
           })
           .join('\n')}</ul>`;
 
-  const bodyHtml = `${marked.parse(intro)}\n<h2>学習トピック</h2>\n${list}`;
-  const page = layout({ title: SITE_TITLE, bodyHtml, backLink: null });
+  const page = `<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${SITE_TITLE}</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+<h1>${SITE_TITLE}</h1>
+<p>AWSの学習トピックごとのまとめページです。</p>
+<h2>学習トピック</h2>
+${list}
+</div>
+</body>
+</html>
+`;
   await mkdir(distDir, { recursive: true });
   await writeFile(join(distDir, 'index.html'), page, 'utf8');
 }
@@ -97,19 +81,27 @@ async function renderIndexPage(topics) {
 async function build() {
   await rm(distDir, { recursive: true, force: true });
   await mkdir(distDir, { recursive: true });
-  await copyFile(join(__dirname, 'style.css'), join(distDir, 'style.css'));
+  await cp(join(__dirname, 'homepage.css'), join(distDir, 'style.css'));
 
   const topics = await findTopics();
   await renderIndexPage(topics);
   for (const topic of topics) {
-    await renderTopicPage(topic);
+    await copyTopicPage(topic);
   }
 
   console.log(`Built ${topics.length} topic page(s) into ${distDir}`);
 }
 
 function serve(port = 4173) {
-  const mimeTypes = { '.html': 'text/html', '.css': 'text/css' };
+  const mimeTypes = {
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'text/javascript',
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+  };
   const server = createServer(async (req, res) => {
     let path = decodeURIComponent(req.url.split('?')[0]);
     if (path.endsWith('/')) path += 'index.html';
@@ -136,7 +128,7 @@ if (watchMode) {
   serve();
   let pending = false;
   watch(repoRoot, { recursive: true }, (_event, filename) => {
-    if (!filename || !filename.endsWith('README.md') || filename.startsWith('site/')) return;
+    if (!filename || filename.startsWith('site/') || filename.includes('node_modules')) return;
     if (pending) return;
     pending = true;
     setTimeout(async () => {

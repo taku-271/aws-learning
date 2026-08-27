@@ -1,3 +1,6 @@
+/* Styles the site's top-level index (dist/index.html) only. Each topic
+   page under topics/<topic>/ brings its own CSS and is not affected by
+   this file. */
 :root {
   color-scheme: light dark;
   --bg: #ffffff;
@@ -5,7 +8,7 @@
   --muted: #656d76;
   --border: #d1d9e0;
   --link: #0969da;
-  --code-bg: #f6f8fa;
+  --hover-bg: #f6f8fa;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -15,7 +18,7 @@
     --muted: #9198a1;
     --border: #30363d;
     --link: #4493f8;
-    --code-bg: #161b22;
+    --hover-bg: #161b22;
   }
 }
 
@@ -38,71 +41,17 @@ body {
   padding: 2.5rem 1.25rem 5rem;
 }
 
-.back {
-  display: inline-block;
-  margin-bottom: 1.5rem;
-  color: var(--link);
-  text-decoration: none;
-  font-size: 0.9rem;
-}
-
-.back:hover {
-  text-decoration: underline;
-}
-
-.markdown-body h1 {
+h1 {
   font-size: 1.9rem;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.4rem;
 }
 
-.markdown-body h2 {
+h2 {
   font-size: 1.4rem;
   margin-top: 2rem;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.3rem;
 }
 
-.markdown-body a {
-  color: var(--link);
-}
-
-.markdown-body code {
-  background: var(--code-bg);
-  padding: 0.15em 0.4em;
-  border-radius: 4px;
-  font-size: 0.9em;
-}
-
-.markdown-body pre {
-  background: var(--code-bg);
-  padding: 1rem;
-  border-radius: 6px;
-  overflow-x: auto;
-}
-
-.markdown-body pre code {
-  background: none;
-  padding: 0;
-}
-
-.markdown-body blockquote {
-  margin-left: 0;
-  padding-left: 1rem;
-  border-left: 3px solid var(--border);
+p {
   color: var(--muted);
-}
-
-.markdown-body table {
-  border-collapse: collapse;
-  width: 100%;
-}
-
-.markdown-body th,
-.markdown-body td {
-  border: 1px solid var(--border);
-  padding: 0.4rem 0.7rem;
-  text-align: left;
 }
 
 .topic-list {
@@ -124,7 +73,7 @@ body {
 }
 
 .topic-list a:hover {
-  background: var(--code-bg);
+  background: var(--hover-bg);
 }
 
 .topic-number {

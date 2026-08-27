@@ -17,8 +17,7 @@
     "destroy": "tsx aws-blocks/scripts/destroy.ts"
   },
   "dependencies": {
-    "@aws-blocks/blocks": "*",
-    "marked": "^18.0.11"
+    "@aws-blocks/blocks": "*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
