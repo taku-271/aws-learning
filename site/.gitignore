@@ -1,0 +1,5 @@
+dist/
+.blocks-sandbox/
+.bb-data/
+aws-blocks/client.js
+aws-blocks/blocks.spec.json
