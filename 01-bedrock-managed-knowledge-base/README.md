@@ -155,9 +155,63 @@ AWS公式の試算例(SharePointから50GBを取り込み、月10万クエリの
 - [Vector database options / Cost comparisons (Prescriptive Guidance)](https://docs.aws.amazon.com/prescriptive-guidance/latest/choosing-an-aws-vector-database-for-rag-use-cases/vector-db-options.html)
 - [Amazon OpenSearch Service Pricing](https://aws.amazon.com/opensearch-service/pricing/)
 
-## 次にやりたいこと(ハンズオン候補)
+## ハンズオン手順
 
-- S3 をデータソースにした Managed Knowledge Base を CDK か Terraform で構築し、
-  `Retrieve` / `RetrieveAndGenerate` API で実際に問い合わせてみる
-- 既存の vector store 型 Knowledge Base(OpenSearch Serverless を自前構築するパターン)
-  とコストや構築の手間を比較する
+### 1. S3 データソースの Managed Knowledge Base を構築し、Retrieve系APIで問い合わせる
+
+代表的なケース: 社内FAQなどのドキュメント群をS3に置き、RAGチャットボットのバックエンドとして
+Managed Knowledge Base を試す。
+
+1. S3バケットを作成し、サンプルドキュメント(FAQのtxt/PDFなど数件)をアップロードする。
+
+   ```bash
+   aws s3 mb s3://my-managed-kb-source-bucket
+   aws s3 cp ./docs/ s3://my-managed-kb-source-bucket/ --recursive
+   ```
+
+2. Bedrockコンソール → **Knowledge bases** → **Create** → **Managed Knowledge Base** で
+   Knowledge Base を作成する。Embeddings model は Default のままにして自動管理に任せる。
+3. データソースとして手順1のS3バケットを接続する。
+4. 作成後、データソースに対して ingestion job を実行し、コンテンツを検索可能にする(コンソールの
+   「Sync」ボタン、またはドキュメント取り込み完了までしばらく待つ)。
+5. コンソールのテストチャット機能で「〜について教えて」のような質問を投げ、出典(citation)付きの
+   回答が返ることを確認する。
+6. CLIから `RetrieveAndGenerate` / `Retrieve` を呼び出して同じ内容を確認する。
+
+   ```bash
+   aws bedrock-agent-runtime retrieve-and-generate \
+     --input '{"text":"FAQの内容について教えて"}' \
+     --retrieve-and-generate-configuration '{
+       "type": "KNOWLEDGE_BASE",
+       "knowledgeBaseConfiguration": {
+         "knowledgeBaseId": "<KNOWLEDGE_BASE_ID>",
+         "modelArn": "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0"
+       }
+     }'
+
+   aws bedrock-agent-runtime retrieve \
+     --knowledge-base-id <KNOWLEDGE_BASE_ID> \
+     --retrieval-query '{"text":"FAQの内容について教えて"}'
+   ```
+
+7. `Retrieve` の結果(関連チャンクと出典)と `RetrieveAndGenerate` の結果(生成された回答)を見比べ、
+   用途によって使い分けられることを確認する。
+8. 確認後、Knowledge Base と S3バケットを削除する。
+
+### 2. 既存の vector store 型 Knowledge Base とコスト・構築の手間を比較する
+
+代表的なケース: 同じデータセットに対して Managed Knowledge Base と、OpenSearch Serverless を
+自前構築する vector store 型 Knowledge Base の両方を作り、構築の手間とコストを比較する。
+
+1. 手順1で使ったのと同じS3データソースを用意する。
+2. 手順1の要領で Managed Knowledge Base を構築し、必要だった設定項目数・構築にかかった時間を
+   メモしておく。
+3. Bedrockコンソールで vector store 型の Knowledge Base を作成する。「Quick create a new vector
+   store」を選び、OpenSearch Serverless コレクションを自動構築させる。チャンク戦略・埋め込み
+   モデルを個別に選択する必要がある点を、手順2との違いとして記録する。
+4. 同じ質問セットを両方の Knowledge Base に対して `RetrieveAndGenerate` で投げ、回答内容・
+   レイテンシの体感差を比較する。
+5. AWS の料金試算(本README「コスト比較」セクション)をもとに、OpenSearch Serverless側は
+   待機しているだけでも最低ラインの課金(4 OCU分)が発生する一方、Managed KB はストレージ +
+   API呼び出し分のみで済むことを、実際のBilling/Cost Explorer上の推移で確認する。
+6. 確認後、両方の Knowledge Base、OpenSearch Serverless コレクション、S3バケットを削除する。
