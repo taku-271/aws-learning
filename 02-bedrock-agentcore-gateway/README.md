@@ -173,8 +173,71 @@ lambda_target = client.create_mcp_gateway_target(
 - [Amazon Bedrock AgentCore Pricing](https://aws.amazon.com/bedrock/agentcore/pricing/)
 - [Propagate user authorization context in AI agents with Amazon Bedrock AgentCore (AWS Security Blog)](https://aws.amazon.com/blogs/security/propagate-user-authorization-context-in-ai-agents-with-amazon-bedrock-agentcore/)
 
-## 今後試したいハンズオン
+## ハンズオン手順
 
-- Lambda TargetをGatewayに登録し、Strands Agentsなどのフレームワークから呼び出す
-- Cognitoによるインバウンド認証(JWT)を設定し、アクセストークン取得〜Gateway呼び出しまでの一連の流れを試す
-- セマンティックツール検索を有効化し、複数ツール登録時の挙動を確認する
+### 1. Lambda TargetをGatewayに登録し、Strands Agentsから呼び出す
+
+代表的なケース: 都市名を受け取って固定の天気情報を返すだけのシンプルなLambda関数を、
+エージェントから呼び出せるツールとして公開する。
+
+1. 入力(都市名)を受け取り、天気情報(ダミーでよい)を返すLambda関数を作成する。
+2. `agentcore create` でGatewayを作成する(対話式でCognitoユーザープール等が自動セットアップされる)。
+3. ツールスキーマ(`name`/`description`/`inputSchema`)を記述した `tools.json` を用意し、
+   Lambda TargetをGatewayに登録する。
+
+   ```bash
+   agentcore add gateway-target \
+     --name WeatherTarget \
+     --type lambda-function-arn \
+     --lambda-arn arn:aws:lambda:us-east-1:123456789012:function:GetWeather \
+     --tool-schema-file tools.json \
+     --gateway MyGateway
+
+   agentcore deploy
+   ```
+
+4. Strands Agentsのエージェントコードから、取得したアクセストークンでGatewayのMCPエンドポイントに
+   接続し、`ListTools` でツール一覧に `WeatherTarget` が現れることを確認する。
+5. エージェントに「東京の天気を教えて」のようなプロンプトを与え、Gateway経由でLambda関数が
+   呼び出され、結果が回答に反映されることを確認する。
+6. 確認後、GatewayとLambda関数を削除する。
+
+### 2. Cognitoによるインバウンド認証(JWT)を設定し、一連の流れを試す
+
+代表的なケース: 認可されたユーザー/エージェントだけがGatewayを呼び出せるようにする。
+
+1. `agentcore create` で自動作成されたCognitoユーザープール(または既存のプール)を確認し、
+   テストユーザーを1件作成してパスワードを設定する。
+2. Gatewayのインバウンド認証設定(`CUSTOM_JWT`)で、CognitoのOIDC Discovery URL・許可する
+   Audience/Client ID・Scopeを設定する。
+3. `aws cognito-idp admin-initiate-auth` でテストユーザーとしてサインインし、IDトークン/
+   アクセストークンを取得する。
+
+   ```bash
+   aws cognito-idp admin-initiate-auth \
+     --user-pool-id <USER_POOL_ID> \
+     --client-id <CLIENT_ID> \
+     --auth-flow ADMIN_USER_PASSWORD_AUTH \
+     --auth-parameters USERNAME=testuser,PASSWORD='<password>'
+   ```
+
+4. 取得したトークンを `Authorization: Bearer <token>` ヘッダーに付与してGatewayのMCP
+   エンドポイントにリクエストし、ツール一覧が取得できることを確認する。
+5. トークンなし、または期限切れ/不正なトークンで同じリクエストを送り、401/403で拒否される
+   ことを確認する。
+6. 確認後、テストユーザーとGatewayを削除する(Cognitoユーザープールを他の検証と共用している
+   場合は残してよい)。
+
+### 3. セマンティックツール検索を有効化し、複数ツール登録時の挙動を確認する
+
+代表的なケース: ツール数が数十個規模に増えたときに、エージェントが自然言語クエリで
+目的のツールを見つけられるかを検証する。
+
+1. 手順1と同様の要領で、説明文(`description`)を変えたLambda Targetを10個以上Gatewayに登録する
+   (例: 注文照会、注文キャンセル、在庫確認、配送状況確認など)。
+2. Gatewayの **Semantic search of tools** オプションを有効化する。
+3. `x_amz_bedrock_agentcore_search` ツールに「注文をキャンセルしたい」のような自然言語クエリを
+   投げ、関連度の高いツール(例: 注文キャンセルツール)が上位に返ることを確認する。
+4. セマンティック検索を無効にした状態(全ツールを毎回列挙する状態)と比較し、エージェントに
+   渡されるプロンプトサイズや応答速度の違いを観察する。
+5. 確認後、追加したTargetとGatewayを削除する。

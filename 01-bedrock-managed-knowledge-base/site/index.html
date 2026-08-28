@@ -302,6 +302,56 @@
   </section>
 
   <section>
+    <h2>ハンズオン手順</h2>
+
+    <h3>1. S3データソースのManaged Knowledge Baseを構築し、Retrieve系APIで問い合わせる</h3>
+    <p>代表的なケース: 社内FAQなどのドキュメント群をS3に置き、RAGチャットボットのバックエンドとして
+      Managed Knowledge Base を試す。</p>
+    <ol class="flow">
+      <li>S3バケットを作成し、サンプルドキュメント(FAQのtxt/PDFなど数件)をアップロードする。</li>
+      <li>Bedrockコンソールで Managed Knowledge Base を作成する(Embeddings model は Default の
+        ままにして自動管理に任せる)。</li>
+      <li>データソースとして手順1のS3バケットを接続する。</li>
+      <li>ingestion job を実行し、コンテンツを検索可能にする。</li>
+      <li>コンソールのテストチャットで質問を投げ、出典(citation)付きの回答が返ることを確認する。</li>
+      <li>CLIから <code>RetrieveAndGenerate</code> / <code>Retrieve</code> を呼び出し、生成された
+        回答と関連チャンクそれぞれの結果を見比べる。</li>
+      <li>確認後、Knowledge Base と S3バケットを削除する。</li>
+    </ol>
+    <pre><code>aws bedrock-agent-runtime retrieve-and-generate \
+  --input '{"text":"FAQの内容について教えて"}' \
+  --retrieve-and-generate-configuration '{
+    "type": "KNOWLEDGE_BASE",
+    "knowledgeBaseConfiguration": {
+      "knowledgeBaseId": "&lt;KNOWLEDGE_BASE_ID&gt;",
+      "modelArn": "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0"
+    }
+  }'
+
+aws bedrock-agent-runtime retrieve \
+  --knowledge-base-id &lt;KNOWLEDGE_BASE_ID&gt; \
+  --retrieval-query '{"text":"FAQの内容について教えて"}'</code></pre>
+
+    <h3>2. 既存のvector store型Knowledge Baseとコスト・構築の手間を比較する</h3>
+    <p>代表的なケース: 同じデータセットに対して Managed Knowledge Base と、OpenSearch
+      Serverless を自前構築する vector store 型 Knowledge Base の両方を作り、構築の手間と
+      コストを比較する。</p>
+    <ol class="flow">
+      <li>手順1と同じS3データソースを用意する。</li>
+      <li>手順1の要領で Managed Knowledge Base を構築し、必要だった設定項目数・構築時間を
+        メモする。</li>
+      <li>「Quick create a new vector store」でOpenSearch Serverlessコレクションを自動構築する
+        vector store 型 Knowledge Base を作成する。チャンク戦略・埋め込みモデルを個別に選択する
+        必要がある点を記録する。</li>
+      <li>同じ質問セットを両方に <code>RetrieveAndGenerate</code> で投げ、回答内容・レイテンシの
+        体感差を比較する。</li>
+      <li>Billing/Cost Explorerで、OpenSearch Serverless側は待機中も最低ライン(4 OCU分)の
+        課金が発生する一方、Managed KBはストレージ+API呼び出し分のみで済むことを確認する。</li>
+      <li>確認後、両方のKnowledge Base、OpenSearch Serverlessコレクション、S3バケットを削除する。</li>
+    </ol>
+  </section>
+
+  <section>
     <h2>参考リンク</h2>
     <ul class="refs">
       <li><a href="https://aws.amazon.com/bedrock/knowledge-bases/">Amazon Bedrock Knowledge Bases 製品ページ</a></li>

@@ -252,14 +252,60 @@ lambda_target = client.create_mcp_gateway_target(
   </section>
 
   <section>
-    <h2>今後試したいハンズオン</h2>
-    <div class="note">
-      <ul style="margin:0;">
-        <li>Lambda TargetをGatewayに登録し、Strands Agentsなどのフレームワークから呼び出す</li>
-        <li>Cognitoによるインバウンド認証(JWT)を設定し、アクセストークン取得〜Gateway呼び出しまでの一連の流れを試す</li>
-        <li>セマンティックツール検索を有効化し、複数ツール登録時の挙動を確認する</li>
-      </ul>
-    </div>
+    <h2>ハンズオン手順</h2>
+
+    <h3>1. Lambda TargetをGatewayに登録し、Strands Agentsから呼び出す</h3>
+    <p>代表的なケース: 都市名を受け取って固定の天気情報を返すだけのシンプルなLambda関数を、
+      エージェントから呼び出せるツールとして公開する。</p>
+    <ol class="flow">
+      <li>入力(都市名)を受け取り、天気情報(ダミーでよい)を返すLambda関数を作成する。</li>
+      <li><code>agentcore create</code> でGatewayを作成する(対話式でCognitoユーザープール等が
+        自動セットアップされる)。</li>
+      <li>ツールスキーマを記述した <code>tools.json</code> を用意し、Lambda TargetをGatewayに
+        登録して <code>agentcore deploy</code> する。</li>
+      <li>Strands Agentsのエージェントコードからアクセストークンを取得してGatewayのMCP
+        エンドポイントに接続し、<code>ListTools</code> でツールが登録されたことを確認する。</li>
+      <li>「東京の天気を教えて」のようなプロンプトを与え、Gateway経由でLambda関数が呼び出され、
+        結果が回答に反映されることを確認する。</li>
+      <li>確認後、GatewayとLambda関数を削除する。</li>
+    </ol>
+    <pre><code>agentcore add gateway-target \
+  --name WeatherTarget \
+  --type lambda-function-arn \
+  --lambda-arn arn:aws:lambda:us-east-1:123456789012:function:GetWeather \
+  --tool-schema-file tools.json \
+  --gateway MyGateway
+
+agentcore deploy</code></pre>
+
+    <h3>2. Cognitoによるインバウンド認証(JWT)を設定し、一連の流れを試す</h3>
+    <p>代表的なケース: 認可されたユーザー/エージェントだけがGatewayを呼び出せるようにする。</p>
+    <ol class="flow">
+      <li>Cognitoユーザープールにテストユーザーを1件作成し、パスワードを設定する。</li>
+      <li>Gatewayのインバウンド認証(<code>CUSTOM_JWT</code>)で、CognitoのOIDC Discovery URL・
+        許可するAudience/Client ID/Scopeを設定する。</li>
+      <li><code>aws cognito-idp admin-initiate-auth</code> でテストユーザーとしてサインインし、
+        IDトークン/アクセストークンを取得する。</li>
+      <li>取得したトークンを <code>Authorization: Bearer</code> ヘッダーに付与してGatewayの
+        MCPエンドポイントにリクエストし、ツール一覧が取得できることを確認する。</li>
+      <li>トークンなし、または不正なトークンで同じリクエストを送り、401/403で拒否されることを
+        確認する。</li>
+      <li>確認後、テストユーザーとGatewayを削除する。</li>
+    </ol>
+
+    <h3>3. セマンティックツール検索を有効化し、複数ツール登録時の挙動を確認する</h3>
+    <p>代表的なケース: ツール数が数十個規模に増えたときに、エージェントが自然言語クエリで
+      目的のツールを見つけられるかを検証する。</p>
+    <ol class="flow">
+      <li>説明文を変えたLambda Targetを10個以上Gatewayに登録する(注文照会・注文キャンセル・
+        在庫確認・配送状況確認など)。</li>
+      <li>Gatewayの <strong>Semantic search of tools</strong> オプションを有効化する。</li>
+      <li><code>x_amz_bedrock_agentcore_search</code> に「注文をキャンセルしたい」のような
+        自然言語クエリを投げ、関連度の高いツールが上位に返ることを確認する。</li>
+      <li>セマンティック検索を無効にした状態と比較し、プロンプトサイズや応答速度の違いを
+        観察する。</li>
+      <li>確認後、追加したTargetとGatewayを削除する。</li>
+    </ol>
   </section>
 
   <section>
