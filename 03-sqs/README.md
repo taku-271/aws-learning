@@ -131,6 +131,26 @@ Lambda を invoke する真のプッシュ型とは仕組みが異なる点に�
   メッセージがキューへ戻る
 - Lambda の関数タイムアウトはキューの可視性タイムアウトより短く設定する必要がある
 
+### なぜ関数タイムアウトを可視性タイムアウトより短くする必要があるのか
+
+**必須の理由(これを破ると二重処理が起きる)**: 関数の処理が終わる前に可視性タイムアウトが切れてしまうと、
+そのメッセージは「処理中」ではなく「未処理」としてキューに再度見える状態に戻る。Lambda は裏側で最大1,000
+並列(リージョンあたり)のポーラーが SQS を見張っているため、再可視化されたメッセージを別のポーラーが受信し、
+まだ動いている1つ目の実行と同時に2つ目の実行が走ってしまう。これを防ぐため、関数タイムアウト ≦ 可視性
+タイムアウトが必須であり、Event Source Mapping の作成/更新時に Lambda 側がこの条件をバリデーションして
+違反時はエラーを返す。
+
+**「6倍以上」という目安の理由**: 単に関数タイムアウト1回分より長ければいいわけではなく、AWS の推奨は
+「関数タイムアウト × 6 + `MaximumBatchingWindowInSeconds`」。
+
+- 前のバッチ処理中にスロットリング(同時実行数上限など)が起きると、Lambda サービスはそのバッチの呼び出しを
+  裏側で再試行する。この再試行にかかる時間も可視性タイムアウトが切れる前に収まっている必要があるため、
+  関数タイムアウト1回分ぴったりでは足りない
+- バッチウィンドウ(`MaximumBatchingWindowInSeconds`)の待機時間も「メッセージが受信されてから処理が
+  終わるまで」の時間に含まれるため、これも余分に見込む必要がある
+- 「6倍」自体は AWS の経験則的な目安であり絶対値ではない。処理時間が安定していて再試行がほぼ起きないなら、
+  もっと小さい倍率でも問題にならないこともある
+
 ```bash
 # CLIでイベントソースマッピングを作成する例
 aws lambda create-event-source-mapping --function-name ProcessSQSRecord --batch-size 10 \
@@ -177,6 +197,7 @@ aws lambda create-event-source-mapping --function-name ProcessSQSRecord --batch-
 - [Tutorial: Using Lambda with Amazon SQS](https://docs.aws.amazon.com/lambda/latest/dg/with-sqs-example.html)
 - [Introducing AWS Lambda batching controls for message broker services (AWS Compute Blog)](https://aws.amazon.com/blogs/compute/introducing-aws-lambda-batching-controls-for-message-broker-services/)
 - [Amazon SQS message timers](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-timers.html)
+- [Why doesn't my Amazon SQS queue invoke my Lambda function?](https://repost.aws/knowledge-center/lambda-sqs-event-source)
 - [Amazon SQS Pricing](https://aws.amazon.com/sqs/pricing/)
 - [Amazon SQS FAQs](https://aws.amazon.com/sqs/faqs/)
 - [Why are my Amazon SQS charges higher than expected?](https://repost.aws/knowledge-center/sqs-high-charges)

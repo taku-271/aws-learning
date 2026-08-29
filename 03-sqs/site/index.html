@@ -173,6 +173,24 @@
       可視性タイムアウト経過後にメッセージがキューへ戻る。Lambdaの関数タイムアウトは、キューの可視性タイムアウト
       より<strong>短く</strong>設定する必要がある(目安として可視性タイムアウトを関数タイムアウトの6倍以上にする)。
     </p>
+
+    <h3>なぜ関数タイムアウトを可視性タイムアウトより短くする必要があるのか</h3>
+    <p>
+      <strong>必須の理由(破ると二重処理が起きる)</strong> — 関数の処理が終わる前に可視性タイムアウトが
+      切れると、そのメッセージは「処理中」ではなく「未処理」としてキューに再度見える状態に戻る。Lambdaは
+      裏側で最大1,000並列(リージョンあたり)のポーラーがSQSを見張っているため、再可視化されたメッセージを
+      別のポーラーが受信し、まだ動いている1つ目の実行と同時に2つ目の実行が走ってしまう。これを防ぐため
+      関数タイムアウト ≦ 可視性タイムアウトが必須で、Event Source Mappingの作成/更新時にLambda側が
+      この条件をバリデーションし、違反時はエラーを返す。
+    </p>
+    <p>
+      <strong>「6倍以上」という目安の理由</strong> — 単に関数タイムアウト1回分より長ければいいわけではなく、
+      AWSの推奨は「関数タイムアウト×6 + <code>MaximumBatchingWindowInSeconds</code>」。前のバッチ処理中に
+      スロットリング(同時実行数上限など)が起きると、Lambdaサービスはそのバッチの呼び出しを裏側で再試行する。
+      この再試行にかかる時間も可視性タイムアウトが切れる前に収まっている必要があるため、関数タイムアウト
+      1回分ぴったりでは足りない。バッチウィンドウの待機時間も「受信してから処理が終わるまで」の時間に
+      含まれるため、これも余分に見込む必要がある。「6倍」自体はAWSの経験則的な目安であり絶対値ではない。
+    </p>
     <pre><code># CLIでイベントソースマッピングを作成する例
 aws lambda create-event-source-mapping --function-name ProcessSQSRecord --batch-size 10 \
   --event-source-arn arn:aws:sqs:us-east-1:111122223333:my-queue</code></pre>
@@ -336,7 +354,7 @@ aws sqs create-queue --queue-name fifo-demo-queue.fifo \
       </div>
       <div class="quiz-feedback" hidden>
         <p class="quiz-result"></p>
-        <p class="quiz-explanation">実行ロールには <code>AWSLambdaSQSQueueExecutionRole</code> が必要。バッチサイズはStandardキューで最大10,000件、FIFOキューで最大10件。関数タイムアウトは可視性タイムアウトより短く設定し、目安として可視性タイムアウトを関数タイムアウトの6倍以上にすることが推奨される。</p>
+        <p class="quiz-explanation">実行ロールには <code>AWSLambdaSQSQueueExecutionRole</code> が必要。バッチサイズはStandardキューで最大10,000件、FIFOキューで最大10件。関数タイムアウトを可視性タイムアウトより短くしないと、処理中に可視性タイムアウトが切れて別のポーラーが同じメッセージを受信し二重処理が起きる。6倍以上という目安は、前のバッチでスロットリングされた際のLambdaの内部リトライ時間やバッチウィンドウの待機時間も見込んだバッファ。</p>
       </div>
     </div>
 
@@ -382,6 +400,7 @@ aws sqs create-queue --queue-name fifo-demo-queue.fifo \
       <li><a href="https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-configure.html">Creating and configuring an Amazon SQS event source mapping(Lambda Developer Guide)</a></li>
       <li><a href="https://aws.amazon.com/blogs/compute/introducing-aws-lambda-batching-controls-for-message-broker-services/">Introducing AWS Lambda batching controls for message broker services(AWS Compute Blog)</a></li>
       <li><a href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-timers.html">Amazon SQS message timers</a></li>
+      <li><a href="https://repost.aws/knowledge-center/lambda-sqs-event-source">Why doesn't my Amazon SQS queue invoke my Lambda function?</a></li>
       <li><a href="https://aws.amazon.com/sqs/pricing/">Amazon SQS Pricing</a></li>
       <li><a href="https://aws.amazon.com/sqs/faqs/">Amazon SQS FAQs</a></li>
     </ul>
