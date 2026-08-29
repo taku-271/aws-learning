@@ -297,6 +297,34 @@ aws sqs create-queue --queue-name fifo-demo-queue.fifo \
         <p class="quiz-explanation">DLQ は、指定回数(<code>maxReceiveCount</code>)処理に失敗したメッセージを隔離する別キュー。不良メッセージがメインキューに残り続けて他メッセージの処理をブロックするのを防ぎ、後から <code>start-message-move-task</code> で redrive して調査・再投入できる。</p>
       </div>
     </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q4. SQS と Lambda の統合(Event Source Mapping)について正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">Lambda の関数タイムアウトは、キューの可視性タイムアウトより長く設定する必要がある</button>
+        <button class="quiz-choice" type="button" data-correct="true">Lambda の関数タイムアウトはキューの可視性タイムアウトより短く設定し、目安として可視性タイムアウトを関数タイムアウトの6倍以上にする</button>
+        <button class="quiz-choice" type="button" data-correct="false">バッチサイズはStandardキューでもFIFOキューでも常に同じ上限(10件)である</button>
+        <button class="quiz-choice" type="button" data-correct="false">Lambda 実行ロールに特別な権限は不要で、デフォルトロールのままで動作する</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">実行ロールには <code>AWSLambdaSQSQueueExecutionRole</code> が必要。バッチサイズはStandardキューで最大10,000件、FIFOキューで最大10件。関数タイムアウトは可視性タイムアウトより短く設定し、目安として可視性タイムアウトを関数タイムアウトの6倍以上にすることが推奨される。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q5. SQS の料金体系として正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false"><code>SendMessage</code> だけが課金対象で、<code>ReceiveMessage</code>や<code>DeleteMessage</code>は無料である</button>
+        <button class="quiz-choice" type="button" data-correct="true">全リクエストが同一料金で課金されるが月100万リクエストまでは無料枠があり、ロングポーリングを使わず高頻度でポーリングすると「空の受信」も課金対象になり想定以上のコストになりやすい</button>
+        <button class="quiz-choice" type="button" data-correct="false">FIFOキューはStandardキューよりも常に安く課金される</button>
+        <button class="quiz-choice" type="button" data-correct="false">SSE(サーバーサイド暗号化)を有効にしても追加料金は一切発生しない</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">無料枠は全アカウントで月100万リクエストまで。<code>SendMessage</code>/<code>ReceiveMessage</code>/<code>DeleteMessage</code>などすべてのリクエストが同一料金で課金され、ロングポーリングを使わず高頻度にポーリングすると「空の受信」もリクエストとしてカウントされコストが増えやすい。SSEを使う場合はKMSのAPI呼び出し分の料金が別途発生する。</p>
+      </div>
+    </div>
   </section>
 
   <section>

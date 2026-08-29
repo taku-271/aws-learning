@@ -396,6 +396,34 @@ aws bedrock-agent-runtime retrieve \
         <p class="quiz-explanation">OpenSearch Serverless は最初のコレクションでindexing/search合わせて最低4 OCUが常時課金され、4 OCU×24h×30日で月$691.20が「待機しているだけ」でもかかる下限になる。一方 Managed Knowledge Base はストレージ課金+API呼び出し課金のシンプルなモデルで、そのような待機コストの下限を持たない。</p>
       </div>
     </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q4. Managed Knowledge Base の機能について正しい説明はどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="true">ハイブリッド検索・ドキュメントランキング・agentic retrieval が標準で組み込まれている</button>
+        <button class="quiz-choice" type="button" data-correct="false">埋め込みモデルはカスタムモデルのみ対応し、デフォルトモデルは存在しない</button>
+        <button class="quiz-choice" type="button" data-correct="false">データソースはS3のみで、SharePointやConfluenceには対応していない</button>
+        <button class="quiz-choice" type="button" data-correct="false">テキストのみに対応し、動画・音声・画像は扱えない</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">Managed Knowledge Base はネイティブコネクタ6種(S3, SharePoint, Confluence, Google Drive, OneDrive, Web Crawler)に対応し、ハイブリッド検索・ドキュメントランキング・agentic retrieval が標準搭載。埋め込みモデルもDefaultを選べば自動選択・管理され、テキストに加え動画・音声・画像を横断したマルチモーダルなKnowledge Baseも構築できる。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q5. パフォーマンス比較の観点で正しい組み合わせはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="true">OpenSearch Serverless は sub-10ms の低レイテンシで高頻度クエリに強く、S3 Vectors はコールドで1秒未満・ウォームで約100msとやや遅い代わりに数十億ベクトル規模の低頻度アクセスに強い</button>
+        <button class="quiz-choice" type="button" data-correct="false">S3 Vectors は OpenSearch Serverless よりも常にレイテンシが低い</button>
+        <button class="quiz-choice" type="button" data-correct="false">Aurora(pgvector)はベクトル検索専用で、リレーショナルクエリと同居させることはできない</button>
+        <button class="quiz-choice" type="button" data-correct="false">Managed Knowledge Base のレイテンシは業界最速であることが公式に保証されている</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">ベクトルストアごとに得意な領域が異なる。OpenSearch Serverless は sub-10ms の高スループット・低レイテンシが強みだが待機コストが高い。S3 Vectors はコールドで1秒未満・ウォームで約100msとやや遅いが、数十億ベクトル規模の低頻度アクセス・長期保存に向く。Managed Knowledge Base の内部レイテンシは非公開(AWSが最適化)。</p>
+      </div>
+    </div>
   </section>
 
   <section>

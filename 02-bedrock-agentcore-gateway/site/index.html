@@ -353,6 +353,34 @@ agentcore deploy</code></pre>
         <p class="quiz-explanation">Targetの数が増えるとすべてのツール定義をプロンプトに含めるのは非効率になる。セマンティックツール検索は自然言語クエリから関連度の高いツールを絞り込んで返すことで、プロンプトサイズとレイテンシを削減する。</p>
       </div>
     </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q4. Gateway の Target について正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">Gateway は Lambda targets しかサポートしていない</button>
+        <button class="quiz-choice" type="button" data-correct="false">Target とは Bedrock Managed Knowledge Base の検索インデックスのことである</button>
+        <button class="quiz-choice" type="button" data-correct="true">Lambda・OpenAPI・Smithy・MCP server など複数種類の Target があり、既存のAPIやLambda、外部MCPサーバーなどをMCPツールとして公開できる</button>
+        <button class="quiz-choice" type="button" data-correct="false">Target を追加すると、その都度 Gateway のエンドポイントURLが変わる</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">Target には Lambda targets、OpenAPI targets、Smithy targets、MCP server targets、API Gateway stage targets、HTTP runtime targets、Connector targets など複数の種類がある。Gateway のエンドポイント(URL)自体は1つのままで、その背後にTargetを追加していく形でツールが増えていく。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q5. AgentCore Gateway の料金モデルとして正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="true">消費ベースの課金モデルで前払い不要・最低利用料金なし。API呼び出し回数やセマンティック検索用にインデックスされたTarget数に応じて課金される</button>
+        <button class="quiz-choice" type="button" data-correct="false">月額固定料金制で、API呼び出し回数に関わらず一定額が課金される</button>
+        <button class="quiz-choice" type="button" data-correct="false">Target を登録した時点でまとまった初期費用が発生する</button>
+        <button class="quiz-choice" type="button" data-correct="false">カスタムのレート制限を設定すると追加料金が発生する</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">前払い不要・最低利用料金なしの消費ベース課金。<code>ListTools</code>/<code>InvokeTool</code>/Search APIなどの呼び出し回数や、セマンティック検索用にインデックスされたTarget数に対して課金される。カスタムのレート制限自体には追加料金はかからない。</p>
+      </div>
+    </div>
   </section>
 
   <section>

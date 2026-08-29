@@ -68,8 +68,12 @@ not the model to copy. For every topic `site/` page:
   design tokens) when the shared `.diagram`/`.card-grid`/`.auth-columns`/`.flow` set doesn't fit the
   content — don't force unrelated content into an existing diagram just to avoid adding a class.
 - Include a 4-choice comprehension quiz near the end of the page, right before the 参考リンク
-  section — 3 questions built from that topic's own content (the same facts covered in the
-  diagrams/tables/cards above), not generic AWS trivia. Follow the `.quiz-item` pattern in
+  section — questions built from that topic's own content (the same facts covered in the
+  diagrams/tables/cards above), not generic AWS trivia. Use at least 3 questions, but scale the
+  count to how much the page covers: skim the page's own section list first, and if 3 questions
+  would leave whole sections (a features table, pricing, hands-on steps, a comparison) completely
+  untouched, add more (`01`/`02`/`03` each ended up at 5) so the quiz samples across most of the
+  page rather than only its first couple of sections. Follow the `.quiz-item` pattern in
   `03-sqs/site/index.html`: each question is a `<div class="quiz-item">` containing one
   `<p class="quiz-question">`, a `.quiz-choices` block of four `<button class="quiz-choice"
   data-correct="true">`/`data-correct="false">` buttons, and a `<div class="quiz-feedback" hidden>`
