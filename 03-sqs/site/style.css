@@ -17,6 +17,12 @@
   --warn-bg: #fdf1e3;
   --warn-fg: #935b12;
   --warn-border: #f0d5ab;
+  --correct-bg: #e7f6ec;
+  --correct-fg: #1c6b3c;
+  --correct-border: #a8dab9;
+  --incorrect-bg: #fbe9e9;
+  --incorrect-fg: #a92f2f;
+  --incorrect-border: #f0b4b4;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -38,6 +44,12 @@
     --warn-bg: #2a2110;
     --warn-fg: #f0c07a;
     --warn-border: #4a3a17;
+    --correct-bg: #123321;
+    --correct-fg: #7fe3a4;
+    --correct-border: #1f5c39;
+    --incorrect-bg: #3a1616;
+    --incorrect-fg: #ff9b9b;
+    --incorrect-border: #6b2626;
   }
 }
 
@@ -343,6 +355,89 @@ ol li, ul li {
 .refs a {
   display: block;
   padding: 0.55rem 0;
+}
+
+/* ---- Quiz: 4-choice comprehension check ---- */
+.quiz-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 1.25rem 1.4rem 1.4rem;
+  margin: 1.25rem 0;
+}
+
+.quiz-question {
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+
+.quiz-choices {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.quiz-choice {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  padding: 0.65rem 0.9rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.quiz-choice:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.quiz-choice:disabled {
+  cursor: default;
+}
+
+.quiz-choice.is-correct {
+  border-color: var(--correct-border);
+  background: var(--correct-bg);
+  color: var(--correct-fg);
+  font-weight: 600;
+}
+
+.quiz-choice.is-incorrect {
+  border-color: var(--incorrect-border);
+  background: var(--incorrect-bg);
+  color: var(--incorrect-fg);
+  font-weight: 600;
+}
+
+.quiz-feedback {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border);
+}
+
+.quiz-result {
+  font-weight: 700;
+  margin: 0 0 0.4rem;
+}
+
+.quiz-result.is-correct {
+  color: var(--correct-fg);
+}
+
+.quiz-result.is-incorrect {
+  color: var(--incorrect-fg);
+}
+
+.quiz-explanation {
+  color: var(--muted);
+  margin: 0;
 }
 
 footer {

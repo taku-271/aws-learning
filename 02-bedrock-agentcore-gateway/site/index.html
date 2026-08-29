@@ -309,6 +309,81 @@ agentcore deploy</code></pre>
   </section>
 
   <section>
+    <h2>理解度クイズ</h2>
+    <p>選択肢をクリックすると、正解と解説が表示されます。</p>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q1. AgentCore Gateway の役割として正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="true">エージェントがツール・他のエージェント・LLMへアクセスするための、単一のセキュアなエントリポイントを提供する</button>
+        <button class="quiz-choice" type="button" data-correct="false">Lambda関数のデプロイを自動化するCI/CDサービス</button>
+        <button class="quiz-choice" type="button" data-correct="false">ベクトルデータベースそのものを提供するサービス</button>
+        <button class="quiz-choice" type="button" data-correct="false">IAMロールの発行だけを行うサービス</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">AgentCore Gateway は、既存のAPI・Lambda・他のエージェント(A2A通信)・複数モデルプロバイダーへのルーティングまでを扱う、エージェント向けAIゲートウェイ。エージェントが単一のMCPエンドポイントを呼び出すだけで、背後の各Targetにアクセスできるようにする。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q2. インバウンド認証とアウトバウンド認証の違いとして正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">インバウンド認証はTargetへの接続情報を管理し、アウトバウンド認証はエージェントの身元を検証する</button>
+        <button class="quiz-choice" type="button" data-correct="true">インバウンド認証はGatewayを呼び出すエージェントをJWTなどで検証し、アウトバウンド認証はGatewayが各Targetへ接続する際の認証情報を扱う</button>
+        <button class="quiz-choice" type="button" data-correct="false">どちらもAPIキー方式のみに対応している</button>
+        <button class="quiz-choice" type="button" data-correct="false">アウトバウンド認証はGatewayでは設定できない</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">インバウンド認証はGatewayを呼び出すエージェント/クライアントを検証する仕組み(JWTベースの<code>CUSTOM_JWT</code>が中心)。アウトバウンド認証はGatewayが各Targetの裏側(Lambda実行ロール、APIキー、OAuthなど)へアクセスする際の認証情報で、Targetごとに異なる方式を設定できる。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q3. セマンティックツール検索(<code>x_amz_bedrock_agentcore_search</code>)の目的として正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">Lambda関数の実行コストを削減する</button>
+        <button class="quiz-choice" type="button" data-correct="false">Targetの認証情報を自動的に生成する</button>
+        <button class="quiz-choice" type="button" data-correct="false">Gatewayの呼び出しログを検索する</button>
+        <button class="quiz-choice" type="button" data-correct="true">自然言語クエリから適切なツールを発見し、ツール数が増えてもプロンプトサイズとレイテンシを抑える</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">Targetの数が増えるとすべてのツール定義をプロンプトに含めるのは非効率になる。セマンティックツール検索は自然言語クエリから関連度の高いツールを絞り込んで返すことで、プロンプトサイズとレイテンシを削減する。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q4. Gateway の Target について正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">Gateway は Lambda targets しかサポートしていない</button>
+        <button class="quiz-choice" type="button" data-correct="false">Target とは Bedrock Managed Knowledge Base の検索インデックスのことである</button>
+        <button class="quiz-choice" type="button" data-correct="true">Lambda・OpenAPI・Smithy・MCP server など複数種類の Target があり、既存のAPIやLambda、外部MCPサーバーなどをMCPツールとして公開できる</button>
+        <button class="quiz-choice" type="button" data-correct="false">Target を追加すると、その都度 Gateway のエンドポイントURLが変わる</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">Target には Lambda targets、OpenAPI targets、Smithy targets、MCP server targets、API Gateway stage targets、HTTP runtime targets、Connector targets など複数の種類がある。Gateway のエンドポイント(URL)自体は1つのままで、その背後にTargetを追加していく形でツールが増えていく。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q5. AgentCore Gateway の料金モデルとして正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="true">消費ベースの課金モデルで前払い不要・最低利用料金なし。API呼び出し回数やセマンティック検索用にインデックスされたTarget数に応じて課金される</button>
+        <button class="quiz-choice" type="button" data-correct="false">月額固定料金制で、API呼び出し回数に関わらず一定額が課金される</button>
+        <button class="quiz-choice" type="button" data-correct="false">Target を登録した時点でまとまった初期費用が発生する</button>
+        <button class="quiz-choice" type="button" data-correct="false">カスタムのレート制限を設定すると追加料金が発生する</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">前払い不要・最低利用料金なしの消費ベース課金。<code>ListTools</code>/<code>InvokeTool</code>/Search APIなどの呼び出し回数や、セマンティック検索用にインデックスされたTarget数に対して課金される。カスタムのレート制限自体には追加料金はかからない。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
     <h2>参考リンク</h2>
     <ul class="refs">
       <li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway.html">Amazon Bedrock AgentCore Gateway: A secure AI gateway for agents, tools, and models(Developer Guide)</a></li>
@@ -329,5 +404,27 @@ agentcore deploy</code></pre>
     を参照。
   </footer>
 </div>
+<script>
+document.querySelectorAll('.quiz-item').forEach((item) => {
+  const choices = item.querySelectorAll('.quiz-choice');
+  const feedback = item.querySelector('.quiz-feedback');
+  const resultEl = item.querySelector('.quiz-result');
+  choices.forEach((choice) => {
+    choice.addEventListener('click', () => {
+      if (item.classList.contains('is-answered')) return;
+      item.classList.add('is-answered');
+      const correct = choice.dataset.correct === 'true';
+      choices.forEach((c) => {
+        c.disabled = true;
+        if (c.dataset.correct === 'true') c.classList.add('is-correct');
+      });
+      if (!correct) choice.classList.add('is-incorrect');
+      resultEl.textContent = correct ? '正解!' : '不正解';
+      resultEl.className = 'quiz-result ' + (correct ? 'is-correct' : 'is-incorrect');
+      feedback.hidden = false;
+    });
+  });
+});
+</script>
 </body>
 </html>

@@ -39,7 +39,8 @@ when browsing between topics. Reuse the same CSS custom properties (`--bg`, `--f
 `--border`, `--link`, `--accent`, `--panel`, `--code-bg`, `--pill-bg`/`--pill-fg`, light/dark via
 `prefers-color-scheme`) and the same structural classes (`.page`, `.back-link`, `header.hero` with
 `.topic-number`/`.pill-row`/`.pill`, `<section>` blocks under `h2`, `.card-grid`, `.flow`, `table`,
-`.refs`, `footer`) established in `02-bedrock-agentcore-gateway/site/`. When writing a new topic's
+`.refs`, `footer`, `.quiz-item`/`.quiz-choices`/`.quiz-choice`/`.quiz-feedback`/`.quiz-result`/
+`.quiz-explanation`) established in `02-bedrock-agentcore-gateway/site/`. When writing a new topic's
 `site/`, copy that topic's `style.css` as the starting point rather than inventing a new one, and
 only add topic-specific classes (like `02`'s `.diagram`/`.auth-columns`) for content that doesn't
 fit the shared components. Link back to the site's top page with `../../index.html` if you want a
@@ -66,9 +67,25 @@ not the model to copy. For every topic `site/` page:
   Add new topic-specific visual classes (in the topic's own `style.css`, following the shared
   design tokens) when the shared `.diagram`/`.card-grid`/`.auth-columns`/`.flow` set doesn't fit the
   content — don't force unrelated content into an existing diagram just to avoid adding a class.
+- Include a 4-choice comprehension quiz near the end of the page, right before the 参考リンク
+  section — questions built from that topic's own content (the same facts covered in the
+  diagrams/tables/cards above), not generic AWS trivia. Use at least 3 questions, but scale the
+  count to how much the page covers: skim the page's own section list first, and if 3 questions
+  would leave whole sections (a features table, pricing, hands-on steps, a comparison) completely
+  untouched, add more (`01`/`02`/`03` each ended up at 5) so the quiz samples across most of the
+  page rather than only its first couple of sections. Follow the `.quiz-item` pattern in
+  `03-sqs/site/index.html`: each question is a `<div class="quiz-item">` containing one
+  `<p class="quiz-question">`, a `.quiz-choices` block of four `<button class="quiz-choice"
+  data-correct="true">`/`data-correct="false">` buttons, and a `<div class="quiz-feedback" hidden>`
+  holding `<p class="quiz-result">` (left empty — the script fills in 正解!/不正解) and
+  `<p class="quiz-explanation">` (write the explanation text here). Copy the same inline
+  `<script>` block (right before `</body>`) that wires up click-to-reveal behavior — it is generic
+  over every `.quiz-item` on the page, so it works unchanged in a new topic's page. Keep the script
+  inline in each page rather than factoring it into a shared `.js` file, consistent with each
+  `site/` page staying a self-contained artifact.
 - When revisiting an existing topic's `site/` page for unrelated work, take the opportunity to add
-  a missing diagram if the page has none — don't leave older pages as prose-only outliers as the
-  design system matures.
+  a missing diagram or quiz if the page doesn't have one — don't leave older pages as outliers as
+  the design system matures.
 
 One exception to the numbered-topic layout: `site/` at the repo root. It is not a study topic — it's
 an AWS Blocks app that collects every topic's `<topic>/site/` directory into a single static HTML

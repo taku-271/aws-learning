@@ -253,6 +253,81 @@ aws sqs create-queue --queue-name fifo-demo-queue.fifo \
   </section>
 
   <section>
+    <h2>理解度クイズ</h2>
+    <p>選択肢をクリックすると、正解と解説が表示されます。</p>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q1. Standard キューと FIFO キューの違いとして正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">Standard キューのほうが送信順を厳密に保証する</button>
+        <button class="quiz-choice" type="button" data-correct="true">Standard キューは少なくとも1回配信で順序はベストエフォート、FIFO キューは正確に1回処理され送信順を厳密に保証する</button>
+        <button class="quiz-choice" type="button" data-correct="false">FIFO キューは重複配信を許容する代わりにスループット無制限になる</button>
+        <button class="quiz-choice" type="button" data-correct="false">両方とも順序保証や重複排除の機能は持たない</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">Standard キューはほぼ無制限のスループットを持つ代わりに「少なくとも1回配信」でまれに重複や順序の入れ替わりが起きる。FIFO キューはデフォルト最大3,000msg/秒(高スループットモードで最大70,000msg/秒)に抑える代わりに、メッセージを正確に1回処理し送信順=受信順を厳密に保証する。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q2. 可視性タイムアウトの説明として正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">メッセージ本文を暗号化して保存する機能</button>
+        <button class="quiz-choice" type="button" data-correct="false">キュー自体を一定時間、外部からアクセス不可にする設定</button>
+        <button class="quiz-choice" type="button" data-correct="true">受信したメッセージを一定時間、他のコンシューマーから不可視にする仕組みで、処理完了前に削除しないと再配信される</button>
+        <button class="quiz-choice" type="button" data-correct="false">DLQへ移動するまでの最大受信回数を指定する設定</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">可視性タイムアウトは、コンシューマーが受信したメッセージをデフォルト30秒(最大12時間)の間、他のコンシューマーから見えなくする仕組み。タイムアウト内に <code>DeleteMessage</code> しないと、メッセージは再びキューに戻り別のコンシューマーへ再配信される。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q3. デッドレターキュー(DLQ)の役割として正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">すべてのメッセージを二重に保存するバックアップ用のキュー</button>
+        <button class="quiz-choice" type="button" data-correct="false">FIFO キュー専用の順序管理の仕組み</button>
+        <button class="quiz-choice" type="button" data-correct="true"><code>maxReceiveCount</code> を超えて処理に失敗し続けたメッセージを隔離し、不良メッセージが他のメッセージをブロックするのを防ぐ</button>
+        <button class="quiz-choice" type="button" data-correct="false">Lambda の実行ログを保存する場所</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">DLQ は、指定回数(<code>maxReceiveCount</code>)処理に失敗したメッセージを隔離する別キュー。不良メッセージがメインキューに残り続けて他メッセージの処理をブロックするのを防ぎ、後から <code>start-message-move-task</code> で redrive して調査・再投入できる。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q4. SQS と Lambda の統合(Event Source Mapping)について正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">Lambda の関数タイムアウトは、キューの可視性タイムアウトより長く設定する必要がある</button>
+        <button class="quiz-choice" type="button" data-correct="true">Lambda の関数タイムアウトはキューの可視性タイムアウトより短く設定し、目安として可視性タイムアウトを関数タイムアウトの6倍以上にする</button>
+        <button class="quiz-choice" type="button" data-correct="false">バッチサイズはStandardキューでもFIFOキューでも常に同じ上限(10件)である</button>
+        <button class="quiz-choice" type="button" data-correct="false">Lambda 実行ロールに特別な権限は不要で、デフォルトロールのままで動作する</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">実行ロールには <code>AWSLambdaSQSQueueExecutionRole</code> が必要。バッチサイズはStandardキューで最大10,000件、FIFOキューで最大10件。関数タイムアウトは可視性タイムアウトより短く設定し、目安として可視性タイムアウトを関数タイムアウトの6倍以上にすることが推奨される。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q5. SQS の料金体系として正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false"><code>SendMessage</code> だけが課金対象で、<code>ReceiveMessage</code>や<code>DeleteMessage</code>は無料である</button>
+        <button class="quiz-choice" type="button" data-correct="true">全リクエストが同一料金で課金されるが月100万リクエストまでは無料枠があり、ロングポーリングを使わず高頻度でポーリングすると「空の受信」も課金対象になり想定以上のコストになりやすい</button>
+        <button class="quiz-choice" type="button" data-correct="false">FIFOキューはStandardキューよりも常に安く課金される</button>
+        <button class="quiz-choice" type="button" data-correct="false">SSE(サーバーサイド暗号化)を有効にしても追加料金は一切発生しない</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">無料枠は全アカウントで月100万リクエストまで。<code>SendMessage</code>/<code>ReceiveMessage</code>/<code>DeleteMessage</code>などすべてのリクエストが同一料金で課金され、ロングポーリングを使わず高頻度にポーリングすると「空の受信」もリクエストとしてカウントされコストが増えやすい。SSEを使う場合はKMSのAPI呼び出し分の料金が別途発生する。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
     <h2>参考リンク</h2>
     <ul class="refs">
       <li><a href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues.html">Amazon SQS standard queues</a></li>
@@ -274,5 +349,27 @@ aws sqs create-queue --queue-name fifo-demo-queue.fifo \
     を参照。
   </footer>
 </div>
+<script>
+document.querySelectorAll('.quiz-item').forEach((item) => {
+  const choices = item.querySelectorAll('.quiz-choice');
+  const feedback = item.querySelector('.quiz-feedback');
+  const resultEl = item.querySelector('.quiz-result');
+  choices.forEach((choice) => {
+    choice.addEventListener('click', () => {
+      if (item.classList.contains('is-answered')) return;
+      item.classList.add('is-answered');
+      const correct = choice.dataset.correct === 'true';
+      choices.forEach((c) => {
+        c.disabled = true;
+        if (c.dataset.correct === 'true') c.classList.add('is-correct');
+      });
+      if (!correct) choice.classList.add('is-incorrect');
+      resultEl.textContent = correct ? '正解!' : '不正解';
+      resultEl.className = 'quiz-result ' + (correct ? 'is-correct' : 'is-incorrect');
+      feedback.hidden = false;
+    });
+  });
+});
+</script>
 </body>
 </html>
