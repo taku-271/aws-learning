@@ -1,0 +1,457 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f5f7fb;
+  --panel: #ffffff;
+  --fg: #10151f;
+  --muted: #57647a;
+  --border: #dde3ee;
+  --link: #0a6cb8;
+  --accent: #0a6cb8;
+  --accent-soft: #e6f1fb;
+  --node-bg: #ffffff;
+  --node-border: #b9c8e0;
+  --edge: #96a7c2;
+  --code-bg: #eef2f9;
+  --pill-bg: #e6f1fb;
+  --pill-fg: #0a6cb8;
+  --warn-bg: #fdf1e3;
+  --warn-fg: #935b12;
+  --warn-border: #f0d5ab;
+  --correct-bg: #e7f6ec;
+  --correct-fg: #1c6b3c;
+  --correct-border: #a8dab9;
+  --incorrect-bg: #fbe9e9;
+  --incorrect-fg: #a92f2f;
+  --incorrect-border: #f0b4b4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0f17;
+    --panel: #121826;
+    --fg: #e7ecf6;
+    --muted: #93a0ba;
+    --border: #263049;
+    --link: #63b8ff;
+    --accent: #63b8ff;
+    --accent-soft: #16273d;
+    --node-bg: #16203344;
+    --node-border: #33456b;
+    --edge: #3d557f;
+    --code-bg: #0e1420;
+    --pill-bg: #10233a;
+    --pill-fg: #7fc4ff;
+    --warn-bg: #2a2110;
+    --warn-fg: #f0c07a;
+    --warn-border: #4a3a17;
+    --correct-bg: #123321;
+    --correct-fg: #7fe3a4;
+    --correct-border: #1f5c39;
+    --incorrect-bg: #3a1616;
+    --incorrect-fg: #ff9b9b;
+    --incorrect-border: #6b2626;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN",
+    "Hiragino Sans", Meiryo, sans-serif;
+  line-height: 1.75;
+}
+
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 6rem;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.back-link:hover {
+  color: var(--link);
+}
+
+header.hero {
+  margin-bottom: 2rem;
+}
+
+.topic-number {
+  display: inline-block;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  font-size: 0.85rem;
+  margin-bottom: 0.6rem;
+}
+
+h1 {
+  font-size: 1.85rem;
+  line-height: 1.35;
+  margin: 0 0 0.7rem;
+}
+
+.lead {
+  color: var(--muted);
+  font-size: 1.05rem;
+  margin-top: 0;
+  max-width: 62ch;
+}
+
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+}
+
+.pill {
+  display: inline-block;
+  background: var(--pill-bg);
+  color: var(--pill-fg);
+  border-radius: 999px;
+  padding: 0.2rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+section {
+  margin-top: 3rem;
+}
+
+h2 {
+  font-size: 1.3rem;
+  margin: 0 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+h2 .step-no {
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  color: var(--accent);
+  font-size: 0.95rem;
+}
+
+h3 {
+  font-size: 1.05rem;
+  margin-top: 1.6rem;
+}
+
+p, li {
+  color: var(--fg);
+}
+
+a {
+  color: var(--link);
+}
+
+code {
+  background: var(--code-bg);
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.88em;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+}
+
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.92rem;
+}
+
+th, td {
+  border: 1px solid var(--border);
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+ol, ul {
+  padding-left: 1.3rem;
+}
+
+ol li, ul li {
+  margin-bottom: 0.4rem;
+}
+
+/* ---- Diagram: agent -> gateway -> targets ---- */
+.diagram {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  padding: 1.5rem 1rem 1.75rem;
+  margin: 1.5rem 0;
+  overflow-x: auto;
+}
+
+.diagram svg {
+  display: block;
+  margin: 0 auto;
+  min-width: 640px;
+  width: 100%;
+  max-width: 760px;
+  height: auto;
+}
+
+.diagram-caption {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin: 0.75rem 0 0;
+}
+
+/* ---- Card grid for benefits / capabilities ---- */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.9rem;
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card-grid li {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  background: var(--panel);
+  margin: 0;
+}
+
+.card-grid strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--accent);
+}
+
+/* ---- Two-column auth panels ---- */
+.auth-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.auth-columns > div {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.1rem 1.2rem;
+  background: var(--panel);
+}
+
+.auth-columns h3 {
+  margin-top: 0;
+  font-size: 1rem;
+}
+
+.auth-columns .direction {
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+/* ---- Setup flow steps ---- */
+.flow {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  counter-reset: flow;
+}
+
+.flow li {
+  counter-increment: flow;
+  position: relative;
+  padding: 0 0 1.2rem 2.6rem;
+  border-left: 2px solid var(--border);
+  margin-left: 0.7rem;
+}
+
+.flow li:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+
+.flow li::before {
+  content: counter(flow);
+  position: absolute;
+  left: -0.95rem;
+  top: -0.1rem;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.note {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  color: var(--warn-fg);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  font-size: 0.9rem;
+  margin: 1rem 0;
+}
+
+.refs {
+  font-size: 0.92rem;
+  list-style: none;
+  padding: 0;
+}
+
+.refs li {
+  border-bottom: 1px solid var(--border);
+}
+
+.refs li:last-child {
+  border-bottom: none;
+}
+
+.refs a {
+  display: block;
+  padding: 0.55rem 0;
+}
+
+/* ---- Quiz: 4-choice comprehension check ---- */
+.quiz-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 1.25rem 1.4rem 1.4rem;
+  margin: 1.25rem 0;
+}
+
+.quiz-question {
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+
+.quiz-choices {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.quiz-choice {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  padding: 0.65rem 0.9rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.quiz-choice:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.quiz-choice:disabled {
+  cursor: default;
+}
+
+.quiz-choice.is-correct {
+  border-color: var(--correct-border);
+  background: var(--correct-bg);
+  color: var(--correct-fg);
+  font-weight: 600;
+}
+
+.quiz-choice.is-incorrect {
+  border-color: var(--incorrect-border);
+  background: var(--incorrect-bg);
+  color: var(--incorrect-fg);
+  font-weight: 600;
+}
+
+.quiz-feedback {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border);
+}
+
+.quiz-result {
+  font-weight: 700;
+  margin: 0 0 0.4rem;
+}
+
+.quiz-result.is-correct {
+  color: var(--correct-fg);
+}
+
+.quiz-result.is-incorrect {
+  color: var(--incorrect-fg);
+}
+
+.quiz-explanation {
+  color: var(--muted);
+  margin: 0;
+}
+
+footer {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* ---- Topic-specific: secondary line inside a table cell ---- */
+.muted-note {
+  display: block;
+  color: var(--muted);
+  font-size: 0.85em;
+  font-weight: 400;
+}

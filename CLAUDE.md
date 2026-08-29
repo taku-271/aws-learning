@@ -18,7 +18,7 @@ Each study topic gets its own top-level directory, numbered in the order it was 
 ├── README.md               # 学習内容のまとめ(概要、ハンズオン手順、参考リンクなど)
 ├── cdk/                     # AWS CDK code, only if this topic includes a CDK hands-on
 ├── terraform/               # Terraform code, only if this topic includes a Terraform hands-on
-└── site/                    # Hand-authored public page for this topic, only if publishing it
+└── site/                    # Hand-authored public page for this topic — created by default alongside README.md
 ```
 
 - Numbering reflects study order — when adding a new topic, use the next unused number.
@@ -29,10 +29,11 @@ Each study topic gets its own top-level directory, numbered in the order it was 
 - When creating a new topic, follow the structure of existing topic directories rather than
   inventing a new layout.
 
-`<topic>/site/`, when present, is a hand-authored `index.html` plus `style.css` that is that topic's
-public page — a separate artifact, not a rendering of the README. It's optional and separate from
-README.md: write it only when the user wants that topic published. It does not need to mirror the
-README's content.
+`<topic>/site/` is a hand-authored `index.html` plus `style.css` that is that topic's public page — a
+separate artifact, not a rendering of the README. By default, create it for every new topic alongside
+its `README.md` (see Study workflow below) — don't wait for the user to ask for publishing separately.
+It is a distinct deliverable from README.md and does not need to mirror the README's content, but skip
+it only if the user explicitly says not to publish a given topic.
 
 All topics' `site/` pages share one common design system, so the published site feels consistent
 when browsing between topics. Reuse the same CSS custom properties (`--bg`, `--fg`, `--muted`,
@@ -106,17 +107,18 @@ writing anything. Do this in order:
    findings into its `README.md` as the study summary.
 3. Only after the summary is written, add hands-on `cdk/` and/or `terraform/` code for the topic if
    requested or appropriate.
-4. If the user wants this topic published to the site, write `<topic>/site/index.html` (see
-   Structure and conventions above) using the shared design system — a hand-authored page, not an
-   auto-generated one, but consistent in look with the other topics' `site/` pages.
+4. By default, also write `<topic>/site/index.html` (see Structure and conventions above) using the
+   shared design system — a hand-authored page, not an auto-generated one, but consistent in look
+   with the other topics' `site/` pages. Do this for every new topic unless the user explicitly says
+   not to publish it; don't wait to be asked.
 5. This isn't limited to the initial study session: whenever later work in the same conversation
    produces a study-relevant result for an existing topic (e.g. answering a follow-up question with
    fresh AWS-doc research, a cost/performance comparison, a deeper dive into one part of the topic),
    append it to that topic's `README.md` too — don't leave it only in the chat response. If that
-   topic already has a `<topic>/site/index.html`, add the same content there as well (matching that
-   page's existing style), so the README and the published site stay in sync. If the topic has no
-   `site/` page yet, updating the README alone is enough — don't create a `site/` page just for this
-   (see Study workflow step 4 for when to add one).
+   topic has a `<topic>/site/index.html`, add the same content there as well (matching that page's
+   existing style), so the README and the published site stay in sync. If an older topic predates
+   this default and has no `site/` page yet, follow the "when revisiting" rule above — add one rather
+   than leaving the README as the only updated file.
 
 If no AWS MCP server is available in the session, tell the user before falling back to general
 knowledge, since the point of this workflow is to ground the notes in current AWS documentation.
