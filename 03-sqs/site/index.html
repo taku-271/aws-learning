@@ -253,6 +253,53 @@ aws sqs create-queue --queue-name fifo-demo-queue.fifo \
   </section>
 
   <section>
+    <h2>理解度クイズ</h2>
+    <p>選択肢をクリックすると、正解と解説が表示されます。</p>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q1. Standard キューと FIFO キューの違いとして正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">Standard キューのほうが送信順を厳密に保証する</button>
+        <button class="quiz-choice" type="button" data-correct="true">Standard キューは少なくとも1回配信で順序はベストエフォート、FIFO キューは正確に1回処理され送信順を厳密に保証する</button>
+        <button class="quiz-choice" type="button" data-correct="false">FIFO キューは重複配信を許容する代わりにスループット無制限になる</button>
+        <button class="quiz-choice" type="button" data-correct="false">両方とも順序保証や重複排除の機能は持たない</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">Standard キューはほぼ無制限のスループットを持つ代わりに「少なくとも1回配信」でまれに重複や順序の入れ替わりが起きる。FIFO キューはデフォルト最大3,000msg/秒(高スループットモードで最大70,000msg/秒)に抑える代わりに、メッセージを正確に1回処理し送信順=受信順を厳密に保証する。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q2. 可視性タイムアウトの説明として正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">メッセージ本文を暗号化して保存する機能</button>
+        <button class="quiz-choice" type="button" data-correct="false">キュー自体を一定時間、外部からアクセス不可にする設定</button>
+        <button class="quiz-choice" type="button" data-correct="true">受信したメッセージを一定時間、他のコンシューマーから不可視にする仕組みで、処理完了前に削除しないと再配信される</button>
+        <button class="quiz-choice" type="button" data-correct="false">DLQへ移動するまでの最大受信回数を指定する設定</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">可視性タイムアウトは、コンシューマーが受信したメッセージをデフォルト30秒(最大12時間)の間、他のコンシューマーから見えなくする仕組み。タイムアウト内に <code>DeleteMessage</code> しないと、メッセージは再びキューに戻り別のコンシューマーへ再配信される。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q3. デッドレターキュー(DLQ)の役割として正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">すべてのメッセージを二重に保存するバックアップ用のキュー</button>
+        <button class="quiz-choice" type="button" data-correct="false">FIFO キュー専用の順序管理の仕組み</button>
+        <button class="quiz-choice" type="button" data-correct="true"><code>maxReceiveCount</code> を超えて処理に失敗し続けたメッセージを隔離し、不良メッセージが他のメッセージをブロックするのを防ぐ</button>
+        <button class="quiz-choice" type="button" data-correct="false">Lambda の実行ログを保存する場所</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">DLQ は、指定回数(<code>maxReceiveCount</code>)処理に失敗したメッセージを隔離する別キュー。不良メッセージがメインキューに残り続けて他メッセージの処理をブロックするのを防ぎ、後から <code>start-message-move-task</code> で redrive して調査・再投入できる。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
     <h2>参考リンク</h2>
     <ul class="refs">
       <li><a href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues.html">Amazon SQS standard queues</a></li>
@@ -274,5 +321,27 @@ aws sqs create-queue --queue-name fifo-demo-queue.fifo \
     を参照。
   </footer>
 </div>
+<script>
+document.querySelectorAll('.quiz-item').forEach((item) => {
+  const choices = item.querySelectorAll('.quiz-choice');
+  const feedback = item.querySelector('.quiz-feedback');
+  const resultEl = item.querySelector('.quiz-result');
+  choices.forEach((choice) => {
+    choice.addEventListener('click', () => {
+      if (item.classList.contains('is-answered')) return;
+      item.classList.add('is-answered');
+      const correct = choice.dataset.correct === 'true';
+      choices.forEach((c) => {
+        c.disabled = true;
+        if (c.dataset.correct === 'true') c.classList.add('is-correct');
+      });
+      if (!correct) choice.classList.add('is-incorrect');
+      resultEl.textContent = correct ? '正解!' : '不正解';
+      resultEl.className = 'quiz-result ' + (correct ? 'is-correct' : 'is-incorrect');
+      feedback.hidden = false;
+    });
+  });
+});
+</script>
 </body>
 </html>

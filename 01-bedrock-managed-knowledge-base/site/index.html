@@ -352,6 +352,53 @@ aws bedrock-agent-runtime retrieve \
   </section>
 
   <section>
+    <h2>理解度クイズ</h2>
+    <p>選択肢をクリックすると、正解と解説が表示されます。</p>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q1. Managed Knowledge Base の最大の特徴として正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">ベクトルストアとしてOpenSearch Serverlessを自分で構築・管理する必要がある</button>
+        <button class="quiz-choice" type="button" data-correct="true">ベクトルストアの選定・構築・スケーリングをBedrockが完全に肩代わりする</button>
+        <button class="quiz-choice" type="button" data-correct="false">データソースはAmazon S3のみに対応している</button>
+        <button class="quiz-choice" type="button" data-correct="false">埋め込みモデルの選択はできず、常にカスタムモデルが必須になる</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">Managed Knowledge Base は、チャンク分割・埋め込みベクトル化・ベクトルストアへの保存/同期までをBedrockが内部で行う作成モード。データソースはS3のほかSharePoint、Confluence、Google Drive、OneDrive、Web Crawlerのネイティブ6種に対応し、埋め込みモデルもDefaultを選べばBedrockが自動選択・管理する。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q2. <code>Retrieve</code> API と <code>RetrieveAndGenerate</code> API の違いとして正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="true"><code>Retrieve</code> は検索結果(関連チャンク)のみを返し、<code>RetrieveAndGenerate</code> は検索から回答生成までを一括で行う</button>
+        <button class="quiz-choice" type="button" data-correct="false">両方とも回答の生成のみを行い、検索結果は返さない</button>
+        <button class="quiz-choice" type="button" data-correct="false"><code>RetrieveAndGenerate</code> のほうが古いAPIで、非推奨になっている</button>
+        <button class="quiz-choice" type="button" data-correct="false"><code>RetrieveAndGenerate</code> は出典(citation)を返さない</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation"><code>RetrieveAndGenerate</code> は、クエリの埋め込み変換・検索・プロンプトへの追加・LLMによる回答生成までを一連の流れとして実行し、会話のセッションコンテキストも管理する。一方 <code>Retrieve</code> は検索結果(関連チャンク)のみを返し、生成は行わない。後続の独自ワークフローに使いたい場合に向く。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q3. OpenSearch Serverless と Managed Knowledge Base のコスト比較として正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="true">OpenSearch Serverless は最小4 OCU分が待機中も常時課金され、月$700弱がかかる下限がある</button>
+        <button class="quiz-choice" type="button" data-correct="false">Managed Knowledge Base は待機しているだけでも月$700弱の課金が発生する</button>
+        <button class="quiz-choice" type="button" data-correct="false">OpenSearch Serverless は待機コストが完全にゼロになる</button>
+        <button class="quiz-choice" type="button" data-correct="false">Aurora Serverless はオートポーズに対応しておらず、常時課金される</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">OpenSearch Serverless は最初のコレクションでindexing/search合わせて最低4 OCUが常時課金され、4 OCU×24h×30日で月$691.20が「待機しているだけ」でもかかる下限になる。一方 Managed Knowledge Base はストレージ課金+API呼び出し課金のシンプルなモデルで、そのような待機コストの下限を持たない。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
     <h2>参考リンク</h2>
     <ul class="refs">
       <li><a href="https://aws.amazon.com/bedrock/knowledge-bases/">Amazon Bedrock Knowledge Bases 製品ページ</a></li>
@@ -372,5 +419,27 @@ aws bedrock-agent-runtime retrieve \
     を参照。
   </footer>
 </div>
+<script>
+document.querySelectorAll('.quiz-item').forEach((item) => {
+  const choices = item.querySelectorAll('.quiz-choice');
+  const feedback = item.querySelector('.quiz-feedback');
+  const resultEl = item.querySelector('.quiz-result');
+  choices.forEach((choice) => {
+    choice.addEventListener('click', () => {
+      if (item.classList.contains('is-answered')) return;
+      item.classList.add('is-answered');
+      const correct = choice.dataset.correct === 'true';
+      choices.forEach((c) => {
+        c.disabled = true;
+        if (c.dataset.correct === 'true') c.classList.add('is-correct');
+      });
+      if (!correct) choice.classList.add('is-incorrect');
+      resultEl.textContent = correct ? '正解!' : '不正解';
+      resultEl.className = 'quiz-result ' + (correct ? 'is-correct' : 'is-incorrect');
+      feedback.hidden = false;
+    });
+  });
+});
+</script>
 </body>
 </html>
