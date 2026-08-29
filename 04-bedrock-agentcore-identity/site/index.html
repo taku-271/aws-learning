@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amazon Bedrock AgentCore Identity — AWS Learning Notes</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+  <a class="back-link" href="../../index.html">&larr; 学習トピック一覧へ</a>
+
+  <header class="hero">
+    <div class="topic-number">TOPIC 04</div>
+    <h1>Amazon Bedrock AgentCore Identity<br>— エージェントのための認証・認可基盤</h1>
+    <p class="lead">
+      AIエージェントという「非人間アイデンティティ」向けに、エージェントの身元管理・呼び出し元の検証
+      (インバウンド認証)・外部サービスへの認証情報の払い出し(アウトバウンド認証)を一元的に扱う
+      サービスについて学んだメモ。
+    </p>
+    <div class="pill-row">
+      <span class="pill">ワークロードアイデンティティ</span>
+      <span class="pill">インバウンド認証(JWT/IAM)</span>
+      <span class="pill">アウトバウンド認証(OAuth/APIキー)</span>
+      <span class="pill">トークンボルト</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>AgentCore Identity は何をしてくれるのか</h2>
+    <p>
+      エージェントは「人間ではないが、人間に代わって(または自律的に)外部リソースにアクセスする」存在で、
+      従来のIAMユーザー/ロールだけでは表現しづらい認可パターンが発生する。複数の外部サービス(Slack、
+      GitHub、Google、Salesforceなど)ごとに異なる認証方式を自前で実装・保管するのはリスクが高く、
+      マルチテナント環境では「Agent AがUser 1の代わりにアクセスする際、誤ってUser 2のデータを取得して
+      しまう」ようなクロステナント漏えいも防がなければならない。
+    </p>
+    <p>
+      <strong>AgentCore Identity はこれらを、SigV4・標準化されたOAuth 2.0フロー・APIキーを横断する形で
+      一元的に扱う</strong>。Amazon Bedrock AgentCoreの他コンポーネント(Runtime、Gateway)と統合されており、
+      それらを使う場合はインバウンド認証・アウトバウンド認証の多くを自動的に肩代わりしてくれる。
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 1040 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ユーザーからRuntime/Gatewayでインバウンド認証を受け、AgentCore Identityがワークロードアクセストークンを発行し、エージェントがResource Credential Provider経由で外部サービスにアウトバウンド認証する一連の流れ">
+        <defs>
+          <marker id="arrow4" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--edge)"></path>
+          </marker>
+        </defs>
+
+        <!-- edges -->
+        <line x1="150" y1="115" x2="165" y2="115" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow4)"></line>
+        <line x1="325" y1="115" x2="340" y2="115" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow4)"></line>
+        <line x1="510" y1="115" x2="525" y2="115" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow4)"></line>
+        <line x1="675" y1="115" x2="690" y2="115" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow4)"></line>
+        <line x1="860" y1="115" x2="875" y2="115" stroke="var(--edge)" stroke-width="2" marker-end="url(#arrow4)"></line>
+
+        <!-- 1: user/client -->
+        <rect x="20" y="70" width="130" height="90" rx="10" fill="var(--node-bg)" stroke="var(--node-border)" stroke-width="1.5"></rect>
+        <text x="85" y="105" text-anchor="middle" font-size="12.5" font-weight="600" fill="var(--fg)">ユーザー</text>
+        <text x="85" y="121" text-anchor="middle" font-size="12.5" font-weight="600" fill="var(--fg)">/ クライアント</text>
+        <text x="85" y="143" text-anchor="middle" font-size="9.5" fill="var(--muted)">① IdP認証・</text>
+        <text x="85" y="155" text-anchor="middle" font-size="9.5" fill="var(--muted)">JWT取得</text>
+
+        <!-- 2: runtime/gateway -->
+        <rect x="165" y="60" width="160" height="110" rx="10" fill="var(--node-bg)" stroke="var(--node-border)" stroke-width="1.5"></rect>
+        <text x="245" y="95" text-anchor="middle" font-size="12" font-weight="600" fill="var(--fg)">AgentCore</text>
+        <text x="245" y="111" text-anchor="middle" font-size="12" font-weight="600" fill="var(--fg)">Runtime / Gateway</text>
+        <text x="245" y="133" text-anchor="middle" font-size="9.5" fill="var(--muted)">② インバウンド認証</text>
+        <text x="245" y="146" text-anchor="middle" font-size="9.5" fill="var(--muted)">(JWT検証 / IAM)</text>
+
+        <!-- 3: AgentCore Identity (highlight) -->
+        <rect x="340" y="45" width="170" height="140" rx="12" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"></rect>
+        <text x="425" y="80" text-anchor="middle" font-size="13" font-weight="700" fill="var(--accent)">AgentCore</text>
+        <text x="425" y="97" text-anchor="middle" font-size="13" font-weight="700" fill="var(--accent)">Identity</text>
+        <line x1="358" y1="108" x2="492" y2="108" stroke="var(--border)"></line>
+        <text x="425" y="126" text-anchor="middle" font-size="9.5" fill="var(--fg)">③ ワークロード</text>
+        <text x="425" y="139" text-anchor="middle" font-size="9.5" fill="var(--fg)">アクセストークン発行</text>
+        <text x="425" y="157" text-anchor="middle" font-size="9.5" fill="var(--fg)">トークンボルト</text>
+
+        <!-- 4: agent code -->
+        <rect x="525" y="70" width="150" height="90" rx="10" fill="var(--node-bg)" stroke="var(--node-border)" stroke-width="1.5"></rect>
+        <text x="600" y="108" text-anchor="middle" font-size="12" font-weight="600" fill="var(--fg)">エージェント</text>
+        <text x="600" y="124" text-anchor="middle" font-size="12" font-weight="600" fill="var(--fg)">コード</text>
+        <text x="600" y="145" text-anchor="middle" font-size="9.5" fill="var(--muted)">④ トークン取得API呼出</text>
+
+        <!-- 5: resource credential provider -->
+        <rect x="690" y="60" width="170" height="110" rx="10" fill="var(--node-bg)" stroke="var(--node-border)" stroke-width="1.5"></rect>
+        <text x="775" y="95" text-anchor="middle" font-size="12" font-weight="600" fill="var(--fg)">Resource</text>
+        <text x="775" y="111" text-anchor="middle" font-size="12" font-weight="600" fill="var(--fg)">Credential Provider</text>
+        <text x="775" y="133" text-anchor="middle" font-size="9.5" fill="var(--muted)">⑤ アウトバウンド認証</text>
+        <text x="775" y="146" text-anchor="middle" font-size="9.5" fill="var(--muted)">(OAuth 2.0 / APIキー)</text>
+
+        <!-- 6: external service -->
+        <rect x="875" y="75" width="145" height="80" rx="10" fill="var(--node-bg)" stroke="var(--node-border)" stroke-width="1.5"></rect>
+        <text x="947" y="110" text-anchor="middle" font-size="12" font-weight="600" fill="var(--fg)">外部サービス</text>
+        <text x="947" y="130" text-anchor="middle" font-size="9.5" fill="var(--muted)">Slack/GitHub/</text>
+        <text x="947" y="142" text-anchor="middle" font-size="9.5" fill="var(--muted)">Google/AWS等</text>
+      </svg>
+      <p class="diagram-caption">
+        インバウンド認証で確立された「検証済みユーザー身元」が、そのままワークロードアクセストークンを
+        経由してアウトバウンド認証(トークンボルトのスコープ)に引き継がれる。
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>AgentCore Identity の主要コンポーネント</h2>
+    <table>
+      <thead><tr><th>コンポーネント</th><th>役割</th></tr></thead>
+      <tbody>
+        <tr><td>Agent identity directory<br><span class="muted-note">(ワークロードアイデンティティディレクトリ)</span></td><td>エージェント/ワークロードのアイデンティティを作成・管理・整理する統一ディレクトリ。ARNで一意に識別され、AWSホスト・自己ホスト・ハイブリッドを問わず組織内エージェントの単一の真実源となる</td></tr>
+        <tr><td>Agent authorizer<br><span class="muted-note">(インバウンド認証)</span></td><td>エージェントを呼び出そうとしているユーザー/サービスが許可されているかを検証する</td></tr>
+        <tr><td>Resource credential provider<br><span class="muted-note">(アウトバウンド認証の設定)</span></td><td>エージェントが外部リソースサーバー(Google、GitHubなど)へアクセスするための認証情報を取得する設定を保持する</td></tr>
+        <tr><td>Resource token vault<br><span class="muted-note">(トークンボルト)</span></td><td>ユーザーのOAuthアクセス/リフレッシュトークン・APIキー・OAuthクライアントシークレットをAWS KMSで暗号化して保管し、エージェントが安全に取得できるようにする</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>インバウンド認証(誰がエージェントを呼び出せるか)</h2>
+    <p>
+      「誰がこのエージェント/Gatewayを呼び出せるか」を検証する仕組みで、AgentCore Runtime・Gateway
+      両方に共通の設定(<code>CustomJWTAuthorizerConfiguration</code>)で構成する。1つのRuntime/Gateway
+      (バージョン)は同時に1つの認証方式のみをサポートする。
+    </p>
+    <div class="auth-columns">
+      <div>
+        <span class="direction">サービス間呼び出し</span>
+        <h3>AWS IAM(SigV4)</h3>
+        <p>
+          AWS内のサービス間呼び出し向け。AWS認証情報でリクエストに署名する。IAM側の設定だけで完結し、
+          AgentCore Identity固有の追加設定は不要。
+        </p>
+      </div>
+      <div>
+        <span class="direction">エンドユーザー認証</span>
+        <h3>OAuth 2.0(JWTベアラートークン)</h3>
+        <p>
+          エンドユーザーが既存のIdP(Amazon Cognito、Okta、Microsoft Entra IDなど)を通じて直接認証する
+          場合。トークンの署名・発行者・有効期限を暗号学的に検証する。
+        </p>
+      </div>
+    </div>
+
+    <h3>JWTオーソライザーの設定項目</h3>
+    <table>
+      <thead><tr><th>設定項目</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td>Discovery URL</td><td>IdPのOIDC Discoveryエンドポイント。指定するだけで、そのOIDC IdPが発行したトークンを動的に検証できる(事前オンボーディング不要)</td></tr>
+        <tr><td>Allowed audiences</td><td>JWTの<code>aud</code>クレームと照合する許可オーディエンス。トークンの使い回しを防ぐ</td></tr>
+        <tr><td>Allowed clients</td><td>JWTの<code>client_id</code>クレームと照合する許可クライアントID</td></tr>
+        <tr><td>Allowed scopes</td><td>許可するOAuthスコープ。設定した場合、少なくとも1つが一致する必要がある</td></tr>
+        <tr><td>Required custom claims</td><td>特定クレーム(例: <code>department</code>)の値が期待値と一致することを要求するルール</td></tr>
+      </tbody>
+    </table>
+
+    <ol class="flow">
+      <li><strong>①ユーザーがIdPで認証</strong><br>Cognito/Okta/Entra IDなどでエンドユーザーが認証し、ベアラートークン(JWT)を受け取る。</li>
+      <li><strong>②クライアントがトークンを付与</strong><br><code>Authorization</code>ヘッダーにJWTを載せてRuntime/Gatewayを呼び出す。</li>
+      <li><strong>③AgentCore IdentityがJWTを検証</strong><br>署名・有効期限・発行者(<code>iss</code>)を暗号学的に検証し、Audience/Client/Scope/カスタムクレームと突き合わせる。</li>
+      <li><strong>④検証結果に応じて処理</strong><br>成功すればリクエストを処理、失敗すればエージェントコード実行前に拒否する。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>ワークロードアイデンティティとワークロードアクセストークン</h2>
+    <p>
+      Runtimeにデプロイされた各エージェントには、自動的に一意の<strong>ワークロードアイデンティティ</strong>
+      が割り当てられる。これはエージェントのAWS環境内での「デジタルな身元」で、IAMロール・OAuth 2.0
+      トークン・APIキーのいずれを使う場合でも一貫した身元を保つ土台になる。
+    </p>
+    <p>
+      <strong>ワークロードアクセストークン</strong>は、エージェントがAgentCore Identityなどファースト
+      パーティのAgentCoreサービスにアクセスするための、AWS署名付きのopaque(不透明)なトークンで、
+      外部サービスには直接使えない。Runtime/Gatewayが自動的に発行してエージェント実行環境に渡す。
+    </p>
+    <table>
+      <thead><tr><th>パターン</th><th>API</th><th>内容</th><th>推奨用途</th></tr></thead>
+      <tbody>
+        <tr><td>JWTベース</td><td><code>GetWorkloadAccessTokenForJWT</code></td><td>エンドユーザーのJWT(発行者・署名・有効期限を暗号学的に検証)を渡してトークンを取得</td><td>本番環境(推奨)</td></tr>
+        <tr><td>UserIdベース</td><td><code>GetWorkloadAccessTokenForUserId</code></td><td>文字列のユーザーIDをそのまま渡してトークンを取得。プラットフォームはこの文字列を検証しない</td><td>開発/クイックスタート、または上流で身元解決済みの場合に限定</td></tr>
+      </tbody>
+    </table>
+
+    <h3>UserIdベースAPIのセキュリティ推奨事項</h3>
+    <ul class="card-grid">
+      <li><strong>信頼できるコンテキストから導出</strong>IAM呼び出し元IDやセッション属性からuserIdを導出し、クライアントから任意の値をそのまま受け取らない。</li>
+      <li><strong>IAM権限を限定</strong><code>GetWorkloadAccessTokenForUserId</code>の権限を必要な範囲だけに絞り、ワイルドカードでの広範な付与を避ける。</li>
+      <li><strong>不要な経路をDeny</strong>常にJWTが使えるワークロードでは、UserIdベースの経路を明示的にDenyする。</li>
+      <li><strong>IdPごとにuserIdを分割</strong><code>provider_id+user_id</code>の形でパーティション分割し、IdP間のユーザーID衝突を防ぐ。</li>
+      <li><strong>監査ログを取得</strong>CloudTrailで呼び出しを監視し、想定外のuserId値を検知する。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>アウトバウンド認証(エージェントが外部サービスへアクセスするしくみ)</h2>
+    <p>
+      外部サービスごとに <strong>Resource Credential Provider</strong>(<code>OAuth2CredentialProvider</code>
+      または<code>ApiKeyCredentialProvider</code>)を作成し、クライアントID/シークレットや認可・トークン
+      エンドポイントを登録する。Slack・GitHub・Google・Microsoft・Okta・Auth0・Cognitoなど主要ベンダーの
+      組み込み設定と、任意のOAuth 2.0プロバイダー向けのカスタム設定の両方に対応する。
+    </p>
+    <div class="auth-columns">
+      <div>
+        <span class="direction">3LO / Authorization Code Grant</span>
+        <h3>ユーザー委任(user-delegated)</h3>
+        <p>
+          ユーザー本人の代わりに、そのユーザーが同意した権限範囲でリソースへアクセスする。初回は認可URLへの
+          リダイレクトとユーザーの同意画面が必要(<code>auth_flow="USER_FEDERATION"</code>)。
+        </p>
+      </div>
+      <div>
+        <span class="direction">2LO / Client Credentials Grant</span>
+        <h3>自律的(autonomous / M2M)</h3>
+        <p>
+          ユーザーを介さず、サービスレベルの認証情報でエージェント自身がアクセスする
+          (<code>auth_flow="M2M"</code>)。認可URLの提示やユーザーリダイレクトは発生しない。
+        </p>
+      </div>
+    </div>
+
+    <h3>初回アクセス時のフロー(ユーザー委任・3LO)</h3>
+    <p>ユーザーがまだそのエージェントにアクセスを許可しておらず、トークンボルトに有効なトークンが
+      存在しない場合の流れ。</p>
+    <ol class="flow">
+      <li><strong>ワークロードアクセストークンを取得</strong><br>エージェントが<code>GetWorkloadAccessTokenForUserId</code>(または<code>ForJWT</code>)を呼び出す。</li>
+      <li><strong>OAuthトークンをリクエスト</strong><br><code>GetResourceOauth2Token</code>を呼び出し、ワークロードアクセストークン・Provider名・必要なスコープ・コールバックURLを渡す。</li>
+      <li><strong>認可URLの発行</strong><br>有効なトークンがないため、AgentCore Identityが<code>sessionUri</code>と認可URLを生成して返す。</li>
+      <li><strong>ユーザーへ同意を依頼</strong><br>エージェントが認可URLをユーザーに提示し、外部サービスの同意画面で許可してもらう。</li>
+      <li><strong>認可コードの交換</strong><br>認可サーバーが認可コードをAgentCore Identityに送り、<code>sessionUri</code>付きでコールバックURL(セッションバインディング用)にユーザーをリダイレクトする。</li>
+      <li><strong>トークンをボルトに保存</strong><br>セッションバインディングで正しいユーザー・Providerの組み合わせを確定し、アクセストークン(とリフレッシュトークン)をトークンボルトに保存する。</li>
+      <li><strong>以降はキャッシュを再利用</strong><br>同じユーザーからの呼び出しでは、キャッシュ済みトークンを使い再度の同意を求めない。期限切れ時はリフレッシュトークンで自動更新する。</li>
+    </ol>
+
+    <div class="note">
+      <strong>セッションバインディング</strong>: <code>CreateOauth2CredentialProvider</code>を呼び出すと、
+      AgentCore Identityはそのプロバイダー専用の一意なOAuth2コールバックURLを発行する。このURLにより、
+      認可コード交換をクロスプロバイダーのリプレイ攻撃やCSRF類似の攻撃から守る。
+    </div>
+
+    <h3>トークンのスコープ分離</h3>
+    <p>
+      ワークロードアクセストークンは「エージェントのワークロードアイデンティティ + ユーザーID」を
+      バインディングキーとしてトークンをキャッシュする。この暗号学的な紐付けにより、User 1の
+      トークンがUser 2のリクエスト処理中に誤って使われる、といったクロステナントの漏えいを
+      アプリケーションロジックのバグに関わらず防止する。
+    </p>
+  </section>
+
+  <section>
+    <h2>理解度クイズ</h2>
+    <p>選択肢をクリックすると、正解と解説が表示されます。</p>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q1. AgentCore Identity の4つの主要コンポーネントに含まれないものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">Agent identity directory(ワークロードアイデンティティディレクトリ)</button>
+        <button class="quiz-choice" type="button" data-correct="false">Resource token vault(トークンボルト)</button>
+        <button class="quiz-choice" type="button" data-correct="true">Lambda関数のコード署名機能</button>
+        <button class="quiz-choice" type="button" data-correct="false">Resource credential provider</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">AgentCore Identityの主要コンポーネントは、Agent identity directory、Agent authorizer、Resource credential provider、Resource token vaultの4つ。Lambdaのコード署名機能はAgentCore Identityの構成要素ではない。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q2. インバウンド認証のJWTオーソライザー設定で、「トークンが別のAPI向けに発行されたものを誤って使い回されることを防ぐ」ために使う項目はどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">Discovery URL</button>
+        <button class="quiz-choice" type="button" data-correct="true">Allowed audiences(<code>aud</code>クレーム)</button>
+        <button class="quiz-choice" type="button" data-correct="false">Required custom claims</button>
+        <button class="quiz-choice" type="button" data-correct="false">Allowed scopes</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">Allowed audiences はJWTの<code>aud</code>クレームと照合する許可オーディエンスのリストで、トークンが意図した以外のAPIで使い回されることを防ぐ。Discovery URLはIdPの検証エンドポイント、Allowed scopesは許可する権限範囲、Required custom claimsは任意クレームの一致条件を扱う。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q3. ワークロードアクセストークンの取得について正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false"><code>GetWorkloadAccessTokenForUserId</code>はJWTの署名・発行者を暗号学的に検証してからトークンを発行する</button>
+        <button class="quiz-choice" type="button" data-correct="true"><code>GetWorkloadAccessTokenForJWT</code>はJWTの署名・発行者・有効期限を検証するため本番環境で推奨される</button>
+        <button class="quiz-choice" type="button" data-correct="false">ワークロードアクセストークンは外部の第三者サービスに直接使える</button>
+        <button class="quiz-choice" type="button" data-correct="false">Runtime管理のワークロードアイデンティティは、エージェント自身がトークンを直接取得できる</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation"><code>GetWorkloadAccessTokenForJWT</code>はJWTを暗号学的に検証してユーザーを一意に識別するため本番推奨。<code>GetWorkloadAccessTokenForUserId</code>は文字列を検証せず扱う。ワークロードアクセストークンはファーストパーティのAgentCoreサービス専用で外部サービスには使えず、Runtime/Gateway管理のアイデンティティはトークンを直接取得できないよう制限されている。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q4. アウトバウンド認証の「ユーザー委任(3LO)」と「自律的(2LO/M2M)」の違いとして正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">3LOはAPIキーのみ、2LOはOAuthのみに対応する</button>
+        <button class="quiz-choice" type="button" data-correct="true">3LOはユーザーの同意画面を経由するAuthorization Code Grant、2LOはユーザーを介さないClient Credentials Grant</button>
+        <button class="quiz-choice" type="button" data-correct="false">3LOと2LOはどちらもユーザーの同意画面を必要とする</button>
+        <button class="quiz-choice" type="button" data-correct="false">2LOはトークンボルトを使わない</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">3LO(<code>USER_FEDERATION</code>)はユーザー本人の同意を得るAuthorization Code Grantで、初回は認可URLへのリダイレクトが発生する。2LO/M2M(<code>M2M</code>)はサービスレベルの認証情報でエージェントが自律的にアクセスするClient Credentials Grantで、ユーザーリダイレクトは発生しない。どちらのトークンもトークンボルトで管理される。</p>
+      </div>
+    </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q5. セッションバインディングとトークンのスコープ分離について正しいものはどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">すべてのCredential Providerは同じコールバックURLを共有する</button>
+        <button class="quiz-choice" type="button" data-correct="false">ワークロードアクセストークンはエージェントのワークロードアイデンティティのみでキャッシュされ、ユーザーIDは無関係である</button>
+        <button class="quiz-choice" type="button" data-correct="true">Credential Providerごとに一意なコールバックURLが発行されてリプレイ/CSRF類似の攻撃を防ぎ、トークンは「ワークロードアイデンティティ+ユーザーID」でキャッシュされてクロステナント漏えいを防ぐ</button>
+        <button class="quiz-choice" type="button" data-correct="false">セッションバインディングはAPIキー認証のみに適用される仕組みである</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation"><code>CreateOauth2CredentialProvider</code>はProviderごとに一意なコールバックURLを発行し、認可コード交換をそのProvider専用に限定する(セッションバインディング)。また、ワークロードアクセストークンは「ワークロードアイデンティティ+ユーザーID」をバインディングキーとしてキャッシュされるため、User 1のトークンがUser 2の処理に誤用されることを防ぐ。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>参考リンク</h2>
+    <ul class="refs">
+      <li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/identity-overview.html">Overview of Amazon Bedrock AgentCore Identity(Developer Guide)</a></li>
+      <li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/identity.html">Provide identity and credential management for agent applications with Amazon Bedrock AgentCore Identity</a></li>
+      <li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/inbound-jwt-authorizer.html">Configure inbound JWT authorizer</a></li>
+      <li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/get-workload-access-token.html">Get workload access token</a></li>
+      <li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/identity-authentication.html">Obtain OAuth 2.0 access token</a></li>
+      <li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-security-best-practices.html">Security best practices for AgentCore Runtime</a></li>
+      <li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-how-it-works.html">AgentCore Runtime: how it works</a></li>
+      <li><a href="https://aws.amazon.com/blogs/machine-learning/introducing-amazon-bedrock-agentcore-identity-securing-agentic-ai-at-scale/">Introducing Amazon Bedrock AgentCore Identity: Securing agentic AI at scale(AWS ML Blog)</a></li>
+      <li><a href="https://aws.amazon.com/blogs/security/securing-ai-agents-with-amazon-bedrock-agentcore-identity/">Securing AI agents with Amazon Bedrock AgentCore Identity(AWS Security Blog)</a></li>
+      <li><a href="https://aws.amazon.com/blogs/security/propagate-user-authorization-context-in-ai-agents-with-amazon-bedrock-agentcore/">Propagate user authorization context in AI agents with Amazon Bedrock AgentCore(AWS Security Blog)</a></li>
+      <li><a href="https://aws.amazon.com/blogs/machine-learning/secure-ai-agents-with-amazon-bedrock-agentcore-identity-on-amazon-ecs/">Secure AI agents with Amazon Bedrock AgentCore Identity on Amazon ECS(AWS ML Blog)</a></li>
+    </ul>
+  </section>
+
+  <footer>
+    リポジトリの学習メモ全文は
+    <a href="https://github.com/taku-271/aws-learning/tree/main/04-bedrock-agentcore-identity">04-bedrock-agentcore-identity/README.md</a>
+    を参照。
+  </footer>
+</div>
+<script>
+document.querySelectorAll('.quiz-item').forEach((item) => {
+  const choices = item.querySelectorAll('.quiz-choice');
+  const feedback = item.querySelector('.quiz-feedback');
+  const resultEl = item.querySelector('.quiz-result');
+  choices.forEach((choice) => {
+    choice.addEventListener('click', () => {
+      if (item.classList.contains('is-answered')) return;
+      item.classList.add('is-answered');
+      const correct = choice.dataset.correct === 'true';
+      choices.forEach((c) => {
+        c.disabled = true;
+        if (c.dataset.correct === 'true') c.classList.add('is-correct');
+      });
+      if (!correct) choice.classList.add('is-incorrect');
+      resultEl.textContent = correct ? '正解!' : '不正解';
+      resultEl.className = 'quiz-result ' + (correct ? 'is-correct' : 'is-incorrect');
+      feedback.hidden = false;
+    });
+  });
+});
+</script>
+</body>
+</html>
