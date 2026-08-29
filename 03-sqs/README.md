@@ -66,7 +66,8 @@ SQS には2種類のキューがあり、要件に応じて選択する。
 
 ### ポーリング方式(ショート/ロングポーリング)
 
-`ReceiveMessage` の挙動を制御するオプション。
+そもそも SQS は「プッシュ」ではなく「プル」型のサービスであり、コンシューマーが `ReceiveMessage` を
+呼ばない限りメッセージは届かない。この `ReceiveMessage` の挙動を制御するのがポーリング方式のオプション。
 
 | 方式 | 挙動 |
 | --- | --- |
@@ -75,7 +76,9 @@ SQS には2種類のキューがあり、要件に応じて選択する。
 
 ほぼすべてのケースでロングポーリングが推奨される。空応答の回数を減らせるためコストと性能の両面で有利。
 ただし、1スレッドで複数キューを順番にポーリングするような設計では、空のキューでロングポーリングの待機時間
-分ブロックされてしまうため注意が必要。
+分ブロックされてしまうため注意が必要。両方式が用意されているのは、この「即時応答が欲しい/複数キューを
+1スレッドで回す」ようなケースと、「空応答を減らしてコスト・性能を最適化したい」大多数のケースとで、
+求められる挙動が異なるため。
 
 ### 遅延キュー (Delay Queues)
 
@@ -84,7 +87,14 @@ SQS には2種類のキューがあり、要件に応じて選択する。
 - 可視性タイムアウトとの違い: 遅延キューは「投入時」に不可視化、可視性タイムアウトは「受信(消費)時」に不可視化
 - Standard キューでは遅延設定の変更は既存メッセージに遡及しないが、FIFO キューでは遡及する
 - メッセージ単位で遅延させたい場合は、キュー全体の `DelaySeconds` ではなくメッセージタイマーを使う
+  (メッセージタイマーの `DelaySeconds` はキュー全体の遅延設定より優先される。ただし FIFO キューは
+  メッセージ単位のタイマーに非対応)
 - 15分を超える柔軟なスケジューリングが必要な場合は Amazon EventBridge Scheduler の利用が推奨される
+
+**いつ使うか**: 「今すぐ処理されると困るメッセージを一定時間隠したい」場面で使う。例えば、ダウンストリーム側の
+結果整合性(レプリケーション等)が追いつくのを待ってから後続処理を走らせたい場合、一定時間後にリマインダー的に
+一度だけ処理したい場合、即リトライしても失敗が確実な処理を少し間を置いてから再試行させたい場合(固定遅延の
+リトライ)など。「受信してから処理に時間がかかる」ケースに使う可視性タイムアウトとは目的が異なる点に注意。
 
 ### 暗号化(SSE)
 
@@ -102,20 +112,64 @@ SQS には2種類のキューがあり、要件に応じて選択する。
 SQS キューを Lambda のイベントソースとして登録すると、Lambda がキューをポーリングしてメッセージのバッチで
 関数を同期呼び出しする。
 
+**ポーリングなのか、イベント駆動なのか**: 両方が正確な答え。SQS はプル型サービスなので、誰かが
+`ReceiveMessage` を呼ばない限りメッセージは配信されない。Lambda と SQS を連携させる Event Source
+Mapping (ESM) では、この「誰か」に相当するポーリング処理を **Lambda サービス側が裏側で肩代わりする**
+(自分でポーリングのコードを書く必要はない)。開発者からは「キューに積まれたら勝手にLambdaが起動する」
+イベント駆動に見えるが、実態は「AWSが管理するポーラーがロングポーリングでメッセージを取得し、バッチが
+たまったら関数を同期呼び出しする」という仕組み。SNS や EventBridge のようにプロデューサー側が直接
+Lambda を invoke する真のプッシュ型とは仕組みが異なる点に注意。
+
 - 実行ロールに `AWSLambdaSQSQueueExecutionRole` マネージドポリシーが必要
 - バッチサイズは Standard キューで最大10,000件、FIFO キューで最大10件(10件を超える場合は
   `MaximumBatchingWindowInSeconds` を1秒以上に設定する必要あり)
+- `MaximumBatchingWindowInSeconds`(バッチが溜まるまで Lambda が待つ最大時間)は **0〜300秒(5分)** まで
+  設定可能。デフォルトは0秒(=メッセージを受け取り次第すぐ呼び出す)
 - Lambda サービス側が最大1,000並列(リージョンあたり)のポーリングスレッドを立ち上げ、キューのトラフィックに
   応じて自動でスケールする
 - 関数が正常終了するとバッチ内のメッセージが削除され、エラー/タイムアウトの場合は可視性タイムアウト経過後に
   メッセージがキューへ戻る
 - Lambda の関数タイムアウトはキューの可視性タイムアウトより短く設定する必要がある
 
+### なぜ関数タイムアウトを可視性タイムアウトより短くする必要があるのか
+
+**必須の理由(これを破ると二重処理が起きる)**: 関数の処理が終わる前に可視性タイムアウトが切れてしまうと、
+そのメッセージは「処理中」ではなく「未処理」としてキューに再度見える状態に戻る。Lambda は裏側で最大1,000
+並列(リージョンあたり)のポーラーが SQS を見張っているため、再可視化されたメッセージを別のポーラーが受信し、
+まだ動いている1つ目の実行と同時に2つ目の実行が走ってしまう。これを防ぐため、関数タイムアウト ≦ 可視性
+タイムアウトが必須であり、Event Source Mapping の作成/更新時に Lambda 側がこの条件をバリデーションして
+違反時はエラーを返す。
+
+**「6倍以上」という目安の理由**: 単に関数タイムアウト1回分より長ければいいわけではなく、AWS の推奨は
+「関数タイムアウト × 6 + `MaximumBatchingWindowInSeconds`」。
+
+- 前のバッチ処理中にスロットリング(同時実行数上限など)が起きると、Lambda サービスはそのバッチの呼び出しを
+  裏側で再試行する。この再試行にかかる時間も可視性タイムアウトが切れる前に収まっている必要があるため、
+  関数タイムアウト1回分ぴったりでは足りない
+- バッチウィンドウ(`MaximumBatchingWindowInSeconds`)の待機時間も「メッセージが受信されてから処理が
+  終わるまで」の時間に含まれるため、これも余分に見込む必要がある
+- 「6倍」自体は AWS の経験則的な目安であり絶対値ではない。処理時間が安定していて再試行がほぼ起きないなら、
+  もっと小さい倍率でも問題にならないこともある
+
 ```bash
 # CLIでイベントソースマッピングを作成する例
 aws lambda create-event-source-mapping --function-name ProcessSQSRecord --batch-size 10 \
   --event-source-arn arn:aws:sqs:us-east-1:111122223333:my-queue
 ```
+
+### キューに貯めて一定間隔でまとめて処理できるか(例: 10分おきに重複排除)
+
+**ESM の `MaximumBatchingWindowInSeconds` は最大300秒(5分)までなので、10分間隔でまとめる用途には
+そのままでは使えない。** より長い間隔で「溜めてからまとめて処理」したい場合は、次のようなパターンを検討する。
+
+- **EventBridge Scheduler(例: 10分ごとの cron)で Lambda を起動し、その Lambda 自身が能動的に
+  `ReceiveMessage` を呼んでキューをドレインする**(ESM は使わず、通常の SDK 呼び出しとして自前でポーリングする
+  構成)。取得したメッセージをアプリ側でキー等をもとに重複排除してからまとめて処理し、`DeleteMessage` する
+- メッセージの内容(または `MessageDeduplicationId`)ベースの重複排除だけが目的なら、FIFO キューの
+  `ContentBasedDeduplication` が使える(ただしこちらは5分間のローリング重複排除ウィンドウであり、
+  「10分ごとに区切ってまとめる」バッチ処理そのものとは別の概念)
+- 時間ウィンドウでの本格的な集計・重複排除が目的なら、SQS より Kinesis Data Streams など時間ウィンドウ処理に
+  向いたサービスの利用も検討する
 
 ## 料金
 
@@ -141,6 +195,9 @@ aws lambda create-event-source-mapping --function-name ProcessSQSRecord --batch-
 - [Server-side encryption](https://docs.aws.amazon.com/help-panel/AWSSimpleQueueService/latest/console/hp-createq-encryption.html)
 - [Creating and configuring an Amazon SQS event source mapping (Lambda Developer Guide)](https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-configure.html)
 - [Tutorial: Using Lambda with Amazon SQS](https://docs.aws.amazon.com/lambda/latest/dg/with-sqs-example.html)
+- [Introducing AWS Lambda batching controls for message broker services (AWS Compute Blog)](https://aws.amazon.com/blogs/compute/introducing-aws-lambda-batching-controls-for-message-broker-services/)
+- [Amazon SQS message timers](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-timers.html)
+- [Why doesn't my Amazon SQS queue invoke my Lambda function?](https://repost.aws/knowledge-center/lambda-sqs-event-source)
 - [Amazon SQS Pricing](https://aws.amazon.com/sqs/pricing/)
 - [Amazon SQS FAQs](https://aws.amazon.com/sqs/faqs/)
 - [Why are my Amazon SQS charges higher than expected?](https://repost.aws/knowledge-center/sqs-high-charges)

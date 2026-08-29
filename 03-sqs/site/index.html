@@ -117,8 +117,8 @@
     <ul class="card-grid">
       <li><strong>可視性タイムアウト</strong>受信したメッセージは一定時間(デフォルト30秒、最大12時間)他のコンシューマーから不可視になる。処理完了前に削除しないと再配信される。</li>
       <li><strong>デッドレターキュー(DLQ)</strong>指定回数(<code>maxReceiveCount</code>)処理に失敗したメッセージを隔離する別キュー。不良メッセージが他メッセージをブロックするのを防ぐ。</li>
-      <li><strong>ロング/ショートポーリング</strong>ショートポーリングは一部サーバーに即座に問い合わせ、ロングポーリングは最大1〜20秒待って空応答を減らす。ほぼ常にロングポーリングが推奨。</li>
-      <li><strong>遅延キュー(Delay Queues)</strong>投入時から最大15分メッセージを不可視にできる。可視性タイムアウトが「受信時」に不可視化するのに対し、こちらは「投入時」。</li>
+      <li><strong>ロング/ショートポーリング</strong>SQSはプル型サービスで、誰かが<code>ReceiveMessage</code>を呼ばない限り何も届かない。ショートポーリングは一部サーバーに即座に問い合わせ、ロングポーリングは最大1〜20秒待って空応答を減らす。ほぼ常にロングポーリングが推奨だが、1スレッドで複数キューを順番に見るような設計では待機時間分ブロックされるため注意。</li>
+      <li><strong>遅延キュー(Delay Queues)</strong>投入時から最大15分メッセージを不可視にできる。可視性タイムアウトが「受信時」に不可視化するのに対し、こちらは「投入時」。ダウンストリームの結果整合性を待つ、固定遅延のリトライなど「今すぐ処理されると困る」場面で使う。</li>
       <li><strong>サーバーサイド暗号化(SSE)</strong>メッセージ本文をKMSキーで暗号化して保存する。キュー名やメッセージIDなどのメタデータは対象外。</li>
       <li><strong>Lambda連携</strong>Event Source MappingでSQSをLambdaのイベントソースとして登録し、バッチ単位で自動的にポーリング・呼び出しできる。</li>
     </ul>
@@ -152,19 +152,65 @@
   <section>
     <h2>Lambda との統合(Event Source Mapping)</h2>
     <p>
-      SQSキューをLambdaのイベントソースとして登録すると、Lambdaサービス側が最大1,000並列(リージョンあたり)の
-      ポーリングスレッドを立ち上げてキューを監視し、メッセージのバッチで関数を同期呼び出しする。関数が正常終了
-      するとバッチ内のメッセージが削除され、エラーやタイムアウトの場合は可視性タイムアウト経過後にメッセージが
-      キューへ戻る。
+      SQSキューをLambdaのイベントソースとして登録すると、Lambdaがキューをポーリングしてメッセージのバッチで
+      関数を同期呼び出しする。
+    </p>
+    <p>
+      <strong>ポーリングなのか、イベント駆動なのか</strong> — 答えは両方。SQSはプル型サービスなので、
+      誰かが <code>ReceiveMessage</code> を呼ばない限りメッセージは配信されない。Event Source Mapping
+      (ESM) では、この「誰か」に相当するポーリング処理を <strong>Lambdaサービス側が裏側で肩代わり</strong>
+      してくれる(自分でポーリングのコードを書く必要はない)。開発者からは「キューに積まれたら勝手にLambdaが
+      起動する」イベント駆動に見えるが、実態は「AWSが管理するポーラーがロングポーリングでメッセージを取得し、
+      バッチが溜まったら関数を同期呼び出しする」仕組み。SNSやEventBridgeのようにプロデューサー側が直接
+      Lambdaをinvokeする真のプッシュ型とは異なる。
     </p>
     <p>
       実行ロールには <code>AWSLambdaSQSQueueExecutionRole</code> が必要。バッチサイズはStandardキューで
-      最大10,000件、FIFOキューで最大10件。Lambdaの関数タイムアウトは、キューの可視性タイムアウトより
-      <strong>短く</strong>設定する必要がある(目安として可視性タイムアウトを関数タイムアウトの6倍以上にする)。
+      最大10,000件、FIFOキューで最大10件。バッチが溜まるまで待つ最大時間
+      <code>MaximumBatchingWindowInSeconds</code> は<strong>最大300秒(5分)</strong>まで(デフォルト0秒)。
+      Lambdaサービス側が最大1,000並列(リージョンあたり)のポーリングスレッドを立ち上げてキューのトラフィックに
+      応じ自動スケールし、関数が正常終了するとバッチ内のメッセージが削除される。エラーやタイムアウトの場合は
+      可視性タイムアウト経過後にメッセージがキューへ戻る。Lambdaの関数タイムアウトは、キューの可視性タイムアウト
+      より<strong>短く</strong>設定する必要がある(目安として可視性タイムアウトを関数タイムアウトの6倍以上にする)。
+    </p>
+
+    <h3>なぜ関数タイムアウトを可視性タイムアウトより短くする必要があるのか</h3>
+    <p>
+      <strong>必須の理由(破ると二重処理が起きる)</strong> — 関数の処理が終わる前に可視性タイムアウトが
+      切れると、そのメッセージは「処理中」ではなく「未処理」としてキューに再度見える状態に戻る。Lambdaは
+      裏側で最大1,000並列(リージョンあたり)のポーラーがSQSを見張っているため、再可視化されたメッセージを
+      別のポーラーが受信し、まだ動いている1つ目の実行と同時に2つ目の実行が走ってしまう。これを防ぐため
+      関数タイムアウト ≦ 可視性タイムアウトが必須で、Event Source Mappingの作成/更新時にLambda側が
+      この条件をバリデーションし、違反時はエラーを返す。
+    </p>
+    <p>
+      <strong>「6倍以上」という目安の理由</strong> — 単に関数タイムアウト1回分より長ければいいわけではなく、
+      AWSの推奨は「関数タイムアウト×6 + <code>MaximumBatchingWindowInSeconds</code>」。前のバッチ処理中に
+      スロットリング(同時実行数上限など)が起きると、Lambdaサービスはそのバッチの呼び出しを裏側で再試行する。
+      この再試行にかかる時間も可視性タイムアウトが切れる前に収まっている必要があるため、関数タイムアウト
+      1回分ぴったりでは足りない。バッチウィンドウの待機時間も「受信してから処理が終わるまで」の時間に
+      含まれるため、これも余分に見込む必要がある。「6倍」自体はAWSの経験則的な目安であり絶対値ではない。
     </p>
     <pre><code># CLIでイベントソースマッピングを作成する例
 aws lambda create-event-source-mapping --function-name ProcessSQSRecord --batch-size 10 \
   --event-source-arn arn:aws:sqs:us-east-1:111122223333:my-queue</code></pre>
+
+    <h3>キューに貯めて一定間隔でまとめて処理できるか(例: 10分おきに重複排除)</h3>
+    <p>
+      ESMの <code>MaximumBatchingWindowInSeconds</code> は最大300秒(5分)までなので、
+      <strong>10分間隔でまとめる用途にはそのままでは使えない</strong>。より長い間隔で「溜めてからまとめて
+      処理」したい場合は、次のようなパターンを検討する。
+    </p>
+    <ul class="card-grid">
+      <li><strong>EventBridge Scheduler + 自前ポーリング</strong>例えば10分ごとのcronでLambdaを起動し、その
+        Lambda自身が能動的に <code>ReceiveMessage</code> を呼んでキューをドレインする(ESMは使わず通常のSDK
+        呼び出しとして実装)。取得したメッセージをアプリ側でキー等をもとに重複排除してからまとめて処理する。</li>
+      <li><strong>FIFOキューの <code>ContentBasedDeduplication</code></strong>メッセージ内容ベースの重複排除
+        だけが目的ならこちらが使える。ただし5分間のローリング重複排除ウィンドウであり、「10分ごとに区切って
+        まとめる」バッチ処理そのものとは別の概念。</li>
+      <li><strong>Kinesis Data Streams などの検討</strong>時間ウィンドウでの本格的な集計・重複排除が目的なら、
+        SQSより時間ウィンドウ処理に向いたサービスの利用も検討する。</li>
+    </ul>
   </section>
 
   <section>
@@ -308,7 +354,7 @@ aws sqs create-queue --queue-name fifo-demo-queue.fifo \
       </div>
       <div class="quiz-feedback" hidden>
         <p class="quiz-result"></p>
-        <p class="quiz-explanation">実行ロールには <code>AWSLambdaSQSQueueExecutionRole</code> が必要。バッチサイズはStandardキューで最大10,000件、FIFOキューで最大10件。関数タイムアウトは可視性タイムアウトより短く設定し、目安として可視性タイムアウトを関数タイムアウトの6倍以上にすることが推奨される。</p>
+        <p class="quiz-explanation">実行ロールには <code>AWSLambdaSQSQueueExecutionRole</code> が必要。バッチサイズはStandardキューで最大10,000件、FIFOキューで最大10件。関数タイムアウトを可視性タイムアウトより短くしないと、処理中に可視性タイムアウトが切れて別のポーラーが同じメッセージを受信し二重処理が起きる。6倍以上という目安は、前のバッチでスロットリングされた際のLambdaの内部リトライ時間やバッチウィンドウの待機時間も見込んだバッファ。</p>
       </div>
     </div>
 
@@ -325,6 +371,20 @@ aws sqs create-queue --queue-name fifo-demo-queue.fifo \
         <p class="quiz-explanation">無料枠は全アカウントで月100万リクエストまで。<code>SendMessage</code>/<code>ReceiveMessage</code>/<code>DeleteMessage</code>などすべてのリクエストが同一料金で課金され、ロングポーリングを使わず高頻度にポーリングすると「空の受信」もリクエストとしてカウントされコストが増えやすい。SSEを使う場合はKMSのAPI呼び出し分の料金が別途発生する。</p>
       </div>
     </div>
+
+    <div class="quiz-item">
+      <p class="quiz-question">Q6. SQSとLambdaの連携で「10分ごとにメッセージをまとめて処理したい」場合、正しい説明はどれか?</p>
+      <div class="quiz-choices">
+        <button class="quiz-choice" type="button" data-correct="false">Event Source Mapping の <code>MaximumBatchingWindowInSeconds</code> に600を指定すればよい</button>
+        <button class="quiz-choice" type="button" data-correct="true"><code>MaximumBatchingWindowInSeconds</code> の上限は300秒(5分)なので10分間隔には使えず、EventBridge Scheduler で起動したLambdaが自前で<code>ReceiveMessage</code>を呼んでドレインするなどの構成が必要</button>
+        <button class="quiz-choice" type="button" data-correct="false">可視性タイムアウトを600秒に設定すれば、Lambdaの呼び出し自体が10分ごとにまとめられる</button>
+        <button class="quiz-choice" type="button" data-correct="false">FIFOキューにすれば自動的に10分間隔でバッチ処理される</button>
+      </div>
+      <div class="quiz-feedback" hidden>
+        <p class="quiz-result"></p>
+        <p class="quiz-explanation">Lambda の Event Source Mapping における <code>MaximumBatchingWindowInSeconds</code> は最大300秒(5分)までしか設定できないため、10分間隔でまとめる用途にはそのままでは使えない。より長い間隔で溜めてから処理したい場合は、EventBridge Scheduler等で定期的にLambdaを起動し、そのLambda自身が能動的に<code>ReceiveMessage</code>を呼んでキューをドレインする構成にする必要がある。可視性タイムアウトは受信後の非表示時間を制御するもので、呼び出し間隔をまとめる機能ではない。</p>
+      </div>
+    </div>
   </section>
 
   <section>
@@ -338,6 +398,9 @@ aws sqs create-queue --queue-name fifo-demo-queue.fifo \
       <li><a href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-delay-queues.html">Amazon SQS delay queues</a></li>
       <li><a href="https://docs.aws.amazon.com/help-panel/AWSSimpleQueueService/latest/console/hp-createq-encryption.html">Server-side encryption</a></li>
       <li><a href="https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-configure.html">Creating and configuring an Amazon SQS event source mapping(Lambda Developer Guide)</a></li>
+      <li><a href="https://aws.amazon.com/blogs/compute/introducing-aws-lambda-batching-controls-for-message-broker-services/">Introducing AWS Lambda batching controls for message broker services(AWS Compute Blog)</a></li>
+      <li><a href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-timers.html">Amazon SQS message timers</a></li>
+      <li><a href="https://repost.aws/knowledge-center/lambda-sqs-event-source">Why doesn't my Amazon SQS queue invoke my Lambda function?</a></li>
       <li><a href="https://aws.amazon.com/sqs/pricing/">Amazon SQS Pricing</a></li>
       <li><a href="https://aws.amazon.com/sqs/faqs/">Amazon SQS FAQs</a></li>
     </ul>
